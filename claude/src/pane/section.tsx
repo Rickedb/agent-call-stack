@@ -31,7 +31,7 @@ export function section($: EngineInterface, c: Pane, top: Node) {
   walk(top, 0, [], true)
 
   // The right-hand cells of every row, measured, so that the columns line up.
-  const cells = rows.map(r => cellsOf(c, r.node, t0))
+  const cells = rows.map(r => cellsOf(c, r.node))
   const s: Section = {
     t0,
     t1,

@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 
 import type { Node } from '../../types'
 import { PANE } from '../config'
-import { readFolded, readMode, readNodes, readSelected, readShown } from '../state'
+import { readFolded, readMode, readNodes, readSelected, readShown, readShut } from '../state'
 import type { Pane as Draw } from './context'
 import { section } from './section'
 import { summary, toolbar } from './toolbar'
@@ -46,6 +46,7 @@ export const pane = (on: On) => {
         isWaterfall,
         fold: new Set(await readFolded($)),
         whole: new Set(await readShown($)),
+        shut: new Set(await readShut($)),
         cols,
         now,
         kids,

@@ -36,6 +36,11 @@
   document.addEventListener('click', e => {
     const el = e.target instanceof Element ? e.target.closest('[data-act]') : null
     if (!el || el.tagName === 'SELECT') return
+    // A copy: the icon says so for a moment (the page is not redrawn for it).
+    if (el.classList.contains('copy-icon')) {
+      el.classList.add('done')
+      setTimeout(() => el.classList.remove('done'), 1500)
+    }
     vscode.postMessage({
       act: el.dataset.act,
       id: el.dataset.id,

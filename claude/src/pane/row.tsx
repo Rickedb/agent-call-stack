@@ -15,18 +15,24 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
   const { node, depth, hidden, trail, isLast } = place
   const hasKids = (c.kids.get(node.id) ?? []).length > 0
   const isPicked = node.id === c.pick
-  const { right, out } = cellsOf(c, node, s.t0)
+  const { right, out } = cellsOf(c, node)
 
   const lead = depth * 2 + 2
+  // The tree says every status with a glyph. The waterfall's bar color already says it, so only
+  // a failure gets one there, after the name.
+  const isFailed = node.status === 'err'
+  const markW = c.isWaterfall ? (isFailed ? 2 : 0) : 2
   const name = node.kind === 'prompt' ? `Prompt ${c.promptNo.get(node.id)}` : node.name
   const own = isLast ? '└─' : '├─'
   const isSlowest = node === s.slowest && s.rowCount > 3 && c.cols >= WIDE
 
-  const tokCol = s.tokW ? s.tokW + 2 : 0
+  // The output size and the time are badges: the text on a fill, a space each side, and one before it.
+  const tokCol = s.tokW ? s.tokW + 3 : 0
+  const timeCol = s.timeW + 3
   // What the label has left once the right-hand cells and the bar column are taken.
   const barCol = c.barW ? c.barW + 1 : 0
   const room =
-    c.cols - lead - 2 - (isSlowest ? 8 : 0) - tokCol - (s.timeW + 1) - barCol - 1
+    c.cols - lead - markW - (isSlowest ? 8 : 0) - tokCol - timeCol - barCol - 1
   const model = node.model ? modelName(node.model) : ''
   const arg = clip(node.arg, room - name.length - (model ? model.length + 1 : 0) - 1)
 
@@ -60,10 +66,11 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
           </Box>
           <Box flexGrow={1} flexShrink={1} overflow="hidden">
             <Button key={`open:${node.id}`} plain onPress={() => void toggleSelected($, node.id)}>
-              <Text color={tint(node)}>{mark(node)} </Text>
+              {c.isWaterfall ? null : <Text color={tint(node)}>{mark(node)} </Text>}
               <Text bold={isPicked || node.kind !== 'tool'} wrap="truncate-end">
                 {name}
               </Text>
+              {c.isWaterfall && isFailed ? <Text color="error">{` ${mark(node)}`}</Text> : null}
               {model ? <Text color="permission">{` ${model}`}</Text> : null}
               {arg ? (
                 <Text dimColor wrap="truncate-end">
@@ -76,11 +83,11 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
           {isSlowest ? <Text color="warning">slowest </Text> : null}
           {tokCol ? (
             <Box width={tokCol} justifyContent="flex-end">
-              <Text dimColor>{out ? `${out}  ` : ''}</Text>
+              {out ? <Text backgroundColor="subtle">{` ${out} `}</Text> : null}
             </Box>
           ) : null}
-          <Box width={s.timeW + 1} justifyContent="flex-end">
-            <Text dimColor>{right}</Text>
+          <Box width={timeCol} justifyContent="flex-end">
+            <Text backgroundColor="subtle">{` ${right} `}</Text>
           </Box>
           {c.barW ? bar(c, node, s.t0, s.t1) : null}
         </Box>

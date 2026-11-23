@@ -38,6 +38,8 @@ Click a row to open its details in a modal over the view: its state, timing, tok
 ## Reading the tree
 
 - **Nesting.** A subagent is a row, and the calls it makes are its children. Guide lines (`├─ └─`) draw the branches. Neither Copilot's hooks nor the engine say which tool call started another, so a tool that calls other tools shows as siblings, not as parent and child; only subagents nest.
+- **Badges and copy.** A row's output size and time are badges (the time is what the call itself took, a prompt's its total; the bar shows where it started). Each input and output text has a copy icon in the top-right corner of its code block, shown on hover as in a markdown preview, which copies the whole text and turns into a check for a moment; "Copy file path" and "Show all" stay as text buttons below it.
+- **Status marks.** The tree puts a glyph on every row (`✓` done, `●` running, `✗` failed). The waterfall does not: the color of a row's bar already says done or running, so only a failure keeps its `✗`, after the name.
 - **Parallel calls are not marked.** Copilot's hooks do not say which calls were started together, and overlap in time alone cannot tell parallel from coincidence, so the tree does not guess. In the waterfall, overlapping bars still show what ran at the same moment.
 
 ## Tokens
@@ -54,7 +56,9 @@ When a prompt has finished and made at least one call, a summary ends its rows (
 - **Tokens**: in (the prompt and every call's input), out (the answer and every call's output) and the total. Estimates, as above: Copilot's hooks give no token counts. `@calltree` ends with the same figures as text.
 - **Subagents**: how many, how many failed, and the longest. They are not counted as tool calls, and their time overlaps their own calls.
 
-**Copy as markdown** (a button on the summary) puts the whole summary on the clipboard as markdown: a bullet list of the figures and a table with every tool, for a ticket, a PR or a chat. `src/view/markdown.ts` builds it.
+The summary collapses to its header with a click on `▾ Summary` (`▸` when collapsed); the copy button stays in the header. It is remembered until the window reloads.
+
+**Copy** (a button on the summary's header) puts the whole summary on the clipboard as markdown: a bullet list of the figures and a table with every tool, for a ticket, a PR or a chat. `src/view/markdown.ts` builds it.
 
 ## Use
 
@@ -73,7 +77,7 @@ Other commands: **Remove Copilot Hooks**, **Clear Recorded Calls**. Setting `aiC
 ## Differences from the Claude Code mod
 
 - **Tokens are all estimates.** The Claude Code mod shows what the API reported for a prompt and each subagent, and the cache split; Copilot's hooks carry no usage.
-- **No model.** Claude Code shows the model each prompt and subagent ran on. Copilot's hooks do not carry one, so this view cannot.
+- **The model is read, not given.** Copilot's hooks carry no model, so a prompt's is read from VS Code's own chat log (`chatSessions/<session id>.jsonl` beside the workspace's storage), the model each request was sent to, and matched to the prompts the hooks saw by order from the newest end. It is shown after the prompt's name, in a call's details ("called by"), and in the summary. That file's format is VS Code's own and not documented, so it can change under us; when the model is not found (or the chat is `auto` and says only that), nothing is shown. A subagent has no model of its own here.
 - **No history backfill.** The mod read the chat's earlier messages when it loaded. Here only what happens after the hooks are installed is recorded (the log does survive reloads, so earlier recorded sessions come back).
 - **Call pairing is best effort.** Some Copilot hosts give tool calls no id. Then a result is paired with its call by tool and arguments, oldest first, which can swap two identical parallel calls.
 - **Subagents.** Copilot's start event may carry no subagent id. Calls inside a subagent are bound to the oldest subagent still waiting for one. The built-in `general-purpose` agent may fire no start/stop events at all (per GitHub's docs), and then it is not drawn.
@@ -81,6 +85,8 @@ Other commands: **Remove Copilot Hooks**, **Clear Recorded Calls**. Setting `aiC
 - Several concurrent chats each have a session; use the drop-down to switch (default: the newest one in this workspace).
 
 ## Layout
+
+Besides the panel, `src/chatmodels.ts` reads the model of each prompt from VS Code's chat log and `src/stats.ts` works out the summary's numbers.
 
 The panel's drawing is one file a concern in `src/view/`, with `src/render.ts` as its one door:
 

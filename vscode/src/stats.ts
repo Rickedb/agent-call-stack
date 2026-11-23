@@ -35,6 +35,17 @@ export type Report = {
   input: number
   output: number
   agents: { count: number; failed: number; ms: number; longest?: Node }
+  /** The models the prompt ran on (one, for now: Copilot names none for a subagent). */
+  models: { model: string; main: boolean; agents: number }[]
+}
+
+/** The model a row ran on: its own, else its nearest ancestor's (a tool call is the loop's). */
+export const modelOf = (list: Node[], n: Node): string | undefined => {
+  const byId = new Map(list.map(x => [x.id, x]))
+  for (let cur: Node | undefined = n; cur; cur = cur.parent ? byId.get(cur.parent) : undefined) {
+    if (cur.model) return cur.model
+  }
+  return undefined
 }
 
 const tok = (n: Node, which: 'input' | 'output') => Math.ceil(sizeOf(n, which) / 4)
@@ -93,6 +104,17 @@ export const reportOf = (top: Node, below: Node[], now: number): Report | undefi
   }
   if (to > from) busy += to - from
 
+  const models: Report['models'] = []
+  for (const n of [top, ...agents]) {
+    if (!n.model) continue
+    let one = models.find(m => m.model === n.model)
+    if (!one) {
+      one = { model: n.model, main: false, agents: 0 }
+      models.push(one)
+    }
+    if (n === top) one.main = true
+    else one.agents++
+  }
   const agentDone = agents.filter(n => n.end !== undefined)
   return {
     calls: tools.length,
@@ -112,5 +134,6 @@ export const reportOf = (top: Node, below: Node[], now: number): Report | undefi
       ms: agentDone.reduce((t, n) => t + took(n), 0),
       longest: [...agentDone].sort((a, b) => took(b) - took(a))[0],
     },
+    models,
   }
 }

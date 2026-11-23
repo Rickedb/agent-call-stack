@@ -3,6 +3,7 @@ import type { EngineInterface } from 'claude-code'
 import type { Node } from '../../types'
 import { clip, dur, modelName, tokCount, tokExact } from '../format'
 import { reportOf, type Report } from '../stats'
+import { toggleShut } from '../state'
 import type { Pane } from './context'
 import { reportMarkdown } from './markdown'
 import { tint } from './theme'
@@ -18,6 +19,8 @@ export function report($: EngineInterface, c: Pane, top: Node) {
   const { Box, Text, Button } = c.els
   const r: Report | undefined = reportOf(top, c.below(top), c.now)
   if (!r) return null
+
+  const isShut = c.shut.has(top.id)
 
   // What went into the model, cached or not: the API counts the three apart.
   const sent = r.usage ? r.usage.input + r.usage.cacheRead + r.usage.cacheWrite : 0
@@ -61,10 +64,10 @@ export function report($: EngineInterface, c: Pane, top: Node) {
     <Box flexDirection="column" borderStyle="round" borderColor={tint(top)} paddingX={1} marginTop={1}>
       <Box justifyContent="space-between">
         <Box flexShrink={1} overflow="hidden">
-          <Text bold wrap="truncate">
-            Summary
-            <Text dimColor>{` · ${verdict} · took ${dur(r.wall)} · ${pct(r.busy, r.wall)}% of it in calls`}</Text>
-          </Text>
+          <Button key={`shut:${top.id}`} plain onPress={() => void toggleShut($, top.id)}>
+            <Text bold wrap="truncate-end">{`${isShut ? '▸' : '▾'} Summary`}</Text>
+            <Text dimColor wrap="truncate-end">{` · ${verdict} · took ${dur(r.wall)} · ${pct(r.busy, r.wall)}% of it in calls`}</Text>
+          </Button>
         </Box>
         <Box flexShrink={0} paddingLeft={1}>
           <Button
@@ -72,11 +75,11 @@ export function report($: EngineInterface, c: Pane, top: Node) {
             plain
             onPress={p => void $.ui.copy({ text: reportMarkdown(`Prompt ${c.promptNo.get(top.id)}`, top, r), surface: p.surface })}
           >
-            Copy as markdown
+            Copy
           </Button>
         </Box>
       </Box>
-      {r.kinds.length ? (
+      {isShut ? null : r.kinds.length ? (
         <Box flexDirection="column" marginTop={1}>
           <Text mono dimColor wrap="truncate">
             {head}
@@ -94,6 +97,7 @@ export function report($: EngineInterface, c: Pane, top: Node) {
           ) : null}
         </Box>
       ) : null}
+      {isShut ? null : (
       <Box flexDirection="column" marginTop={1}>
         {r.slowest ? line('Average', `${dur(Math.round(r.avg))} a tool call`) : null}
         {r.slowest ? line('Slowest', `${named(r.slowest)}  ${dur(r.slowest.end! - r.slowest.start)}`) : null}
@@ -124,6 +128,7 @@ export function report($: EngineInterface, c: Pane, top: Node) {
         {r.usage ? line('Call text', `in ${tokCount(r.input)} · out ${tokCount(r.output)} (estimated, what the calls were given and returned)`) : null}
         {facts.map(f => line('Subagents', f))}
       </Box>
+      )}
     </Box>
   )
 }

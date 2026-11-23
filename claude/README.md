@@ -17,6 +17,8 @@ Stack (innermost first)
 ## Reading the tree
 
 - **Nesting.** A subagent is a row, and the calls it makes are its children. Guide lines (`├─ └─`) draw the branches. Neither Copilot's hooks nor the engine say which tool call started another, so a tool that calls other tools shows as siblings, not as parent and child; only subagents nest.
+- **Badges and copy.** A row's output size and time are badges (`~340 tok`, `400ms`). Each input and output text has a copy icon (`⧉`) in the top-right corner of its box, which copies the whole text; "Copy file path" and "Show all" stay as text buttons below it.
+- **Status marks.** The tree puts a glyph on every row (`✓` done, `●` running, `✗` failed). The waterfall does not: the color of a row's bar already says done or running, so only a failure keeps its `✗`, after the name.
 - **Parallel calls are not marked.** Neither the engine nor Copilot's hooks say which calls were started together, and overlap in time alone cannot tell parallel from coincidence, so the tree does not guess. In the waterfall, overlapping bars still show what ran at the same moment.
 
 ## Tokens
@@ -30,7 +32,7 @@ The [Copilot port](../vscode/README.md) estimates everything: its hooks carry no
 
 ## Models
 
-A prompt and each subagent show the model they ran on, in color after their name (`Prompt 1 opus-5-5`; the date a model id carries is dropped). A prompt's model is read from its first model response and settled at its end, from what the API says answered (a fallback can change it). A subagent's is the one its spawn resolved to. A tool call has none of its own: its details say which model called it, the model of the prompt or subagent it ran in. A finished prompt's summary lists the models used. The [Copilot port](../vscode/README.md) has no model: its hooks do not carry one.
+A prompt and each subagent show the model they ran on, in color after their name (`Prompt 1 opus-5-5`; the date a model id carries is dropped). A prompt's model is read from its first model response and settled at its end, from what the API says answered (a fallback can change it). A subagent's is the one its spawn resolved to. A tool call has none of its own: its details say which model called it, the model of the prompt or subagent it ran in. A finished prompt's summary lists the models used. The [Copilot port](../vscode/README.md) shows the prompt's model only, read from VS Code's chat log, since its hooks carry none.
 
 ## Summary of a finished prompt
 
@@ -43,13 +45,15 @@ When a prompt has finished and made at least one call, a summary ends its rows (
 - **Models**: the models the prompt and its subagents ran on.
 - **Subagents**: how many, how many failed, and the longest. They are not counted as tool calls, and their time overlaps their own calls.
 
-**Copy as markdown** (a button on the summary) puts the whole summary on the clipboard as markdown: a bullet list of the figures and a table with every tool, for a ticket, a PR or a chat. `src/pane/markdown.ts` builds it.
+The summary collapses to its header with a click on `▾ Summary` (`▸` when collapsed); the copy button stays in the header. A prompt's choice is kept.
+
+**Copy** (a button on the summary's header) puts the whole summary on the clipboard as markdown: a bullet list of the figures and a table with every tool, for a ticket, a PR or a chat. `src/pane/markdown.ts` builds it.
 
 ## Use
 
 The pane opens at session start. Run `/call-tree` to open it again.
 
-Rows draw in columns (output tokens, time) with a single colored status glyph. In the waterfall each call is one line, with its bar in a column at the right end, drawn with boxes (no text to wrap, whatever the surface's font); the bar column is a quarter of the width (8 to 32 cells) and is always there. A pane narrower than 72 columns gives up the `+start` text and the "slowest" label first (the bar already shows where a call started), and the name truncates last. The newest prompt is on top. When a prompt starts, the ones before it fold away (open any again with its arrow, or use *fold all* / *unfold all*).
+Rows draw in columns (output tokens, time) with a single colored status glyph. In the waterfall each call is one line, with its bar in a column at the right end, drawn with boxes (no text to wrap, whatever the surface's font); the bar column is a quarter of the width (8 to 32 cells) and is always there. A row's time badge is what the call itself took (a prompt's, its total), never the time elapsed before it: the bar shows where it started. A pane narrower than 72 columns gives up the "slowest" label first, and the name truncates last. The newest prompt is on top. When a prompt starts, the ones before it fold away (open any again with its arrow, or use *fold all* / *unfold all*).
 
 Details open inline, under the row you click. (The engine has no modal API; the VS Code port opens them in a modal. See `AGENTS.md`.)
 

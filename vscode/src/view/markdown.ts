@@ -2,7 +2,7 @@ import type { Session } from '../model'
 import { reportOf, type Report } from '../stats'
 import type { Node } from '../types'
 import { index } from './context'
-import { clip, dur, tokCount } from './format'
+import { clip, dur, modelName, tokCount } from './format'
 
 // Table cells and inline code must not break the markdown around them.
 const cell = (s: string): string => s.replace(/\|/g, '\\|').replace(/\s+/g, ' ').trim()
@@ -21,6 +21,7 @@ export const reportMarkdown = (title: string, top: Node, r: Report, now: number)
   )
   if (r.slowest) out.push(`- **Average call:** ${dur(r.avg)} · **slowest:** ${call(r.slowest)} ${took(r.slowest)}`)
   if (r.heaviest) out.push(`- **Heaviest call:** ${call(r.heaviest)} ${tokCount(r.heavy)}`)
+  if (r.models.length) out.push(`- **Models:** ${r.models.map(m => modelName(m.model)).join(' · ')}`)
   out.push(`- **Tokens (estimated):** in ${tokCount(r.input)} · out ${tokCount(r.output)} · total ${tokCount(r.input + r.output)}`)
   if (r.agents.count) {
     const a = r.agents

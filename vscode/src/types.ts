@@ -20,6 +20,8 @@ export type Node = {
   /** Where the whole text went when it was cut: a file the recorder wrote. */
   inputFile?: string
   outputFile?: string
+  /** The model a prompt was sent to, read from VS Code's chat log (the hooks carry none). */
+  model?: string
 }
 
 export type EvKind =

@@ -4,6 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import * as vscode from 'vscode'
 
+import { ChatModelReader } from './chatmodels'
 import { collapseOlder } from './collapse'
 import { hookFile, installHookFile, installRecorder, removeHookFile } from './hooks'
 import type { Session } from './model'
@@ -32,6 +33,8 @@ class CallTreeView implements vscode.WebviewViewProvider {
   private picked = ''
   private folded = new Set<string>()
   private shown = new Set<string>()
+  /** The prompts whose summary is collapsed to its header. */
+  private shut = new Set<string>()
   /** The prompts already seen, so that only a new one folds the rest. */
   private seen = new Set<string>()
 
@@ -55,11 +58,23 @@ class CallTreeView implements vscode.WebviewViewProvider {
     )
   }
 
+  /** Reads the model of each prompt from VS Code's own chat logs, which the hooks do not carry. */
+  private models = new ChatModelReader(() => {
+    const dirs: string[] = []
+    // The workspace's storage folder is `<workspaceStorage>/<hash>/<extension id>`; the chats sit beside it.
+    if (this.ctx.storageUri) dirs.push(path.join(path.dirname(this.ctx.storageUri.fsPath), 'chatSessions'))
+    // A window with no folder keeps its chats beside the extensions' global storage.
+    dirs.push(path.join(path.dirname(this.ctx.globalStorageUri.fsPath), 'emptyWindowChatSessions'))
+    return dirs
+  })
+
   /** The session drawn: the one picked, else the newest of this workspace. */
   current(): Session | undefined {
     const list = this.store.model.list(workspaceFolders())
     // By default the newest one that has a prompt: one that only started has nothing to show.
-    return (this.picked && list.find(s => s.id === this.picked)) || list.find(hasPrompt) || list[0]
+    const s = (this.picked && list.find(s => s.id === this.picked)) || list.find(hasPrompt) || list[0]
+    this.models.apply(s)
+    return s
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -99,6 +114,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
       selected: this.selected,
       folded: this.folded,
       shown: this.shown,
+      shut: this.shut,
       now: Date.now(),
       hooksInstalled: hooksInstalled(),
       hooksOff: vscode.workspace.getConfiguration('chat').get<boolean>('useHooks') === false,
@@ -134,6 +150,9 @@ class CallTreeView implements vscode.WebviewViewProvider {
         this.folded = ids.every(id => this.folded.has(id)) ? new Set() : new Set(ids)
         break
       }
+      case 'shut':
+        if (m.id) toggle(this.shut, m.id)
+        break
       case 'more':
         if (m.id && m.which) toggle(this.shown, `${m.id}:${m.which}`)
         break
@@ -159,7 +178,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
           await vscode.env.clipboard.writeText(md)
           void vscode.window.setStatusBarMessage('Call tree: summary copied as markdown', 2000)
         }
-        break
+        return
       }
       case 'copy':
       case 'copyPath': {
@@ -171,7 +190,8 @@ class CallTreeView implements vscode.WebviewViewProvider {
         else if (file) text = await fs.promises.readFile(file, 'utf8').catch(() => text)
         await vscode.env.clipboard.writeText(text)
         void vscode.window.setStatusBarMessage('Call tree: copied', 2000)
-        break
+        // Nothing changed on screen but the icon, which the page flips itself: no redraw.
+        return
       }
     }
     this.render()

@@ -15,6 +15,8 @@ export type Pane = {
   isWaterfall: boolean
   /** The ids of the rows whose children are folded away. */
   fold: Set<string>
+  /** The prompts whose summary is collapsed. */
+  shut: Set<string>
   /** The texts shown whole, as `<id>:input` or `<id>:output`. */
   whole: Set<string>
   cols: number

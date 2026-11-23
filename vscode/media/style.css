@@ -67,13 +67,11 @@ hr { border: 0; border-top: 1px solid var(--vscode-panel-border); margin: 12px 0
 .fold { flex: none; width: 14px; color: var(--vscode-descriptionForeground); text-align: center; }
 .label { flex: 1; min-width: 0; display: flex; gap: 6px; align-items: baseline; white-space: nowrap; overflow: hidden; }
 .label .arg { overflow: hidden; text-overflow: ellipsis; }
-.time { flex: none; font-variant-numeric: tabular-nums; }
 .track { height: 6px; margin: 0 0 0 18px; background: var(--vscode-editorWidget-background, rgba(128,128,128,.15)); border-radius: 2px; overflow: hidden; }
 .fill { height: 100%; border-radius: 2px; }
 
 .block pre { margin: 2px 0; padding: 6px 8px; background: var(--vscode-textCodeBlock-background); font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); white-space: pre-wrap; word-break: break-word; border-radius: 3px; }
 .actions { display: flex; gap: 12px; }
-.tok { flex: none; font-variant-numeric: tabular-nums; }
 
 /* Guide lines of the tree, over the whole item. */
 :root { --c-guide: var(--vscode-tree-indentGuidesStroke, rgba(128,128,128,.55)); }
@@ -106,3 +104,19 @@ hr { border: 0; border-top: 1px solid var(--vscode-panel-border); margin: 12px 0
 
 .report-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .head-text { min-width: 0; }
+.head-toggle { display: flex; align-items: baseline; gap: 4px; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The output size and the time of a row, as badges. */
+.badge { flex: none; padding: 0 7px; border-radius: 9px; font-size: .92em; line-height: 16px; font-variant-numeric: tabular-nums; white-space: nowrap; background: color-mix(in srgb, var(--vscode-foreground) 14%, transparent); color: var(--vscode-foreground); }
+
+/* A text's copy icon, in the corner of its code block; it shows on hover and focus, as in a markdown preview. */
+.code { position: relative; }
+.copy-icon { position: absolute; top: 6px; right: 6px; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; border-radius: 4px; color: var(--vscode-foreground); background: var(--vscode-editorWidget-background, rgba(128,128,128,.2)); border: 1px solid var(--vscode-panel-border, rgba(128,128,128,.35)); opacity: 0; transition: opacity .12s; }
+.code:hover .copy-icon, .copy-icon:focus-visible, .copy-icon.done { opacity: 1; }
+.copy-icon:hover { background: var(--vscode-toolbar-hoverBackground, rgba(128,128,128,.3)); }
+.copy-icon .i-check { display: none; color: var(--c-tool); }
+.copy-icon.done .i-copy { display: none; }
+.copy-icon.done .i-check { display: block; }
+.code pre { padding-right: 36px; }
+
+.model { flex: none; color: var(--c-agent); }

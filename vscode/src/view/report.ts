@@ -1,6 +1,6 @@
 import { reportOf } from '../stats'
 import type { Node } from '../types'
-import { button, clip, dur, esc, tint, tokCount } from './format'
+import { button, clip, dur, esc, modelName, tint, tokCount } from './format'
 import type { Ctx } from './types'
 
 const MAX_KINDS = 8
@@ -13,6 +13,7 @@ export const report = (c: Ctx, top: Node): string => {
   const r = reportOf(top, c.below(top), c.v.now)
   if (!r) return ''
 
+  const isShut = c.v.shut.has(top.id)
   const shown = r.kinds.slice(0, MAX_KINDS)
   const table = shown.length
     ? `<table class="kinds">
@@ -38,6 +39,7 @@ export const report = (c: Ctx, top: Node): string => {
     r.slowest ? fact('Average', `${dur(r.avg)} a tool call`) : '',
     r.slowest ? fact('Slowest', `${named(r.slowest)}  ${dur(took(r.slowest))}`) : '',
     r.heaviest ? fact('Heaviest', `${named(r.heaviest)}  ${tokCount(r.heavy)}`) : '',
+    r.models.length ? fact('Models', r.models.map(m => modelName(m.model)).join(' · ')) : '',
     fact('Tokens', `in ${tokCount(r.input)} · out ${tokCount(r.output)} · total ${tokCount(r.input + r.output)} (estimated)`),
     a.count
       ? fact(
@@ -49,11 +51,11 @@ export const report = (c: Ctx, top: Node): string => {
 
   return `<div class="report tint-${tint(top)}-border">
       <div class="report-head">
-        <div class="head-text"><b>Summary</b>
-          <span class="dim"> · ${r.calls} tool calls${r.failed ? ` · ${r.failed} failed` : ''} · took ${dur(r.wall)} · ${pct(r.busy, r.wall)}% of it in calls</span></div>
-        ${button('copySummary', 'Copy as markdown', `data-id="${esc(top.id)}"`, 'plain')}
+        <button class="head-text head-toggle" data-act="shut" data-id="${esc(top.id)}" aria-expanded="${!isShut}" title="${isShut ? 'Show' : 'Hide'} the summary"><span class="fold">${isShut ? '▸' : '▾'}</span><b>Summary</b>
+          <span class="dim"> · ${r.calls} tool calls${r.failed ? ` · ${r.failed} failed` : ''} · took ${dur(r.wall)} · ${pct(r.busy, r.wall)}% of it in calls</span></button>
+        ${button('copySummary', 'Copy', `data-id="${esc(top.id)}" title="Copy the summary as markdown"`, 'plain')}
       </div>
-      ${table}
-      <div class="facts">${facts}</div>
+      ${isShut ? '' : `${table}
+      <div class="facts">${facts}</div>`}
     </div>`
 }

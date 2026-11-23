@@ -2,7 +2,7 @@ import type { Session } from '../model'
 import { reportOf } from '../stats'
 import type { Node } from '../types'
 import { index } from './context'
-import { clip, dur, icon, mark, sizeOf, span, tokCount, tokText } from './format'
+import { clip, dur, icon, mark, modelName, sizeOf, span, tokCount, tokText } from './format'
 
 /**
  * The tree as plain text, for a chat reply (`@calltree`): the stack of what runs
@@ -18,7 +18,7 @@ export const renderText = (s: Session | undefined, now: number): string => {
   const line = (n: Node) => {
     const name = n.kind === 'prompt' ? `Prompt ${prompts.indexOf(n) + 1}` : n.name
     const arg = n.arg && n.kind !== 'prompt' ? `(${clip(n.arg, 60)})` : n.kind === 'prompt' ? ` ${clip(n.arg, 60)}` : ''
-    return `${icon(n)} ${mark(n)} ${name}${arg}`
+    return `${icon(n)} ${mark(n)} ${name}${n.model ? ` [${modelName(n.model)}]` : ''}${arg}`
   }
   const size = (n: Node) => (sizeOf(n, 'output') > 0 ? `  ${tokText(n, 'output')}` : '')
 

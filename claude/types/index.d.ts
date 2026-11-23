@@ -57,6 +57,8 @@ declare module 'claude-code' {
       filled: Shaped<boolean>
       /** The texts shown whole, as `<id>:input` or `<id>:output`. */
       shown: Shaped<string[]>
+      /** The prompts whose summary is collapsed to its header. */
+      shut: Shaped<string[]>
     }
   }
 }

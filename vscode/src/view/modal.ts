@@ -1,7 +1,8 @@
 import type { Node } from '../types'
 import { block } from './blocks'
 import { promptOf, timesOf } from './context'
-import { button, dur, esc, icon, mark, span, statusWord, tint, tokText } from './format'
+import { modelOf } from '../stats'
+import { button, dur, esc, icon, mark, modelName, span, statusWord, tint, tokText } from './format'
 import type { Ctx } from './types'
 
 /**
@@ -12,6 +13,7 @@ import type { Ctx } from './types'
 export const modal = (c: Ctx, n: Node): string => {
   const { t0, t1 } = timesOf(c, promptOf(c, n))
   const took = span(n, c.v.now)
+  const model = modelOf(c.list, n)
   const title = n.kind === 'prompt' ? `Prompt ${c.promptNo.get(n.id)}` : n.name
   return `<div class="overlay">
     <div class="backdrop" data-act="close"></div>
@@ -27,6 +29,7 @@ export const modal = (c: Ctx, n: Node): string => {
         ${n.arg ? `<div class="modal-arg">${esc(n.arg)}</div>` : ''}
         <div class="dim">started +${dur(n.start - t0)} · took ${dur(took)} · ${Math.min(100, Math.round((took / t1) * 100))}% of prompt</div>
         <div class="dim">input ${tokText(n, 'input')} · output ${tokText(n, 'output')}</div>
+        ${model ? `<div class="dim">${n.model ? 'model' : 'called by'} ${esc(modelName(model))}</div>` : ''}
         ${block(c, n, 'input')}
         ${block(c, n, 'output')}
       </div>

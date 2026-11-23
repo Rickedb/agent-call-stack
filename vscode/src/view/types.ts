@@ -7,6 +7,8 @@ export type View = {
   selected: string
   /** The ids of the rows whose children are folded away. */
   folded: Set<string>
+  /** The prompts whose summary is collapsed to its header. */
+  shut: Set<string>
   /** The texts shown whole, as `<id>:input` or `<id>:output`. */
   shown: Set<string>
   now: number

@@ -24,6 +24,11 @@ test('the waterfall lists a call and a press opens its details', async ($, on) =
   on('session.start', (_, e) => ({ cwd: e.cwd }))
   on('turn.start', (_, e) => ({ turnId: e.turnId }))
   on('tool.call', () => ({ result: {}, text: 'file one\nfile two' }))
+  const copied: string[] = []
+  on('ui.copy', (_, e) => {
+    copied.push(e.text)
+    return { value: { ok: true } } as never
+  })
 
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await $.turn.start({ text: 'list the files', turnId: 't1' })
@@ -40,13 +45,17 @@ test('the waterfall lists a call and a press opens its details', async ($, on) =
     expect(row).toBeDefined()
 
     // The row shows the output's size: "file one\nfile two" is 17 characters, ~5 tokens.
-    expect(await ui.find({ type: 'Text', text: /^~5 tok/ })).toBeDefined()
+    expect(await ui.find({ type: 'Text', text: /^ ~5 tok $/ })).toBeDefined()
 
     await ui.press({ key: row?.key ?? '' })
 
     expect(await ui.find({ type: 'Text', text: /file two/ })).toBeDefined()
     // The details show both sizes: "command: ls" is 11 characters, ~3 tokens.
     expect(await ui.find({ type: 'Text', text: /input ~3 tok · output ~5 tok/ })).toBeDefined()
+
+    // The icon on the output's corner copies the whole output.
+    await ui.press({ key: `copy:${row?.key?.replace('open:', '')}:output` })
+    expect(copied.at(-1)).toBe('file one\nfile two')
 
     // The selection is the session's: close it so the next surface starts clean.
     await ui.press({ key: 'close' })
@@ -69,17 +78,17 @@ test('the same calls draw as a tree and as a waterfall', async ($, on) => {
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
 
-  // The waterfall is the default: each row shows where it starts.
-  expect(await ui.find({ type: 'Text', text: /^\+\d+ms/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /\d+%/ })).toBeUndefined()
+  // A row's time is what the call took, never a start offset or a percent: in the waterfall and the tree.
+  const times = async () => (await ui.findAll({ type: 'Text', text: /^ \d+ms $/ })).length
+  expect(await times()).toBeGreaterThan(0)
+  expect(await ui.find({ type: 'Text', text: /\+\d+ms|\d+%/ })).toBeUndefined()
 
-  // The tree is compact: a duration per call, no start offset, no percent.
   await ui.press({ key: 'view-tree' })
-  expect(await ui.find({ type: 'Text', text: /^\+\d+ms/ })).toBeUndefined()
-  expect(await ui.find({ type: 'Text', text: /\d+%/ })).toBeUndefined()
+  expect(await times()).toBeGreaterThan(0)
+  expect(await ui.find({ type: 'Text', text: /\+\d+ms|\d+%/ })).toBeUndefined()
 
   await ui.press({ key: 'view-waterfall' })
-  expect(await ui.find({ type: 'Text', text: /^\+\d+ms/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /\+\d+ms/ })).toBeUndefined()
   await ui.unmount()
 })
 
@@ -143,7 +152,9 @@ test('a long result is cut in the state and kept whole in a file', async ($, on)
   const row = await ui.find({ type: 'Button', text: /Bash/ })
   await ui.press({ key: row?.key ?? '' })
   expect(await ui.find({ type: 'Text', text: /first 8,000 of 50,000 characters/ })).toBeDefined()
-  expect(await ui.find({ type: 'Button', text: /Copy all/ })).toBeDefined()
+  // A copy icon on the corner of each text; the file path stays a text button.
+  expect((await ui.findAll({ type: 'Button', text: /⧉/ })).length).toBe(2)
+  expect(await ui.find({ type: 'Button', text: /Copy file path/ })).toBeDefined()
   await ui.unmount()
 })
 
@@ -225,6 +236,7 @@ const injected = (): Record<string, [string, unknown]> => {
     selected: ['selected-1', ''],
     folded: ['folded-1', []],
     shown: ['shown-1', []],
+    shut: ['shut-1', []],
     nodes: [
       'nodes-5',
       [
@@ -267,7 +279,7 @@ test('the nesting is clear in the tree, and nothing is marked as parallel', asyn
   }
 })
 
-test('a narrow pane keeps the bar, and gives up the start text and the slowest label', async ($, on) => {
+test('a narrow pane keeps the bar, and gives up the slowest label', async ($, on) => {
   const held = injected()
   held.mode = ['mode-2', 'waterfall']
   on('state.get', (_, e) => {
@@ -282,8 +294,8 @@ test('a narrow pane keeps the bar, and gives up the start text and the slowest l
       b => b.props?.backgroundColor === 'subtle' && b.props?.width === barW,
     )
     expect(tracks.length).toBe(6) // one per row: the prompt, the agent and its calls
-    // A wide pane also says where each call started, and which was slowest.
-    expect((await ui.findAll({ type: 'Text', text: /^\+\d+ms/ })).length > 0).toBe(isWide)
+    // A wide pane also says which call was slowest; the time is the call's own at every width.
+    expect((await ui.findAll({ type: 'Text', text: /\+\d+ms/ })).length).toBe(0)
     expect((await ui.findAll({ type: 'Text', text: /slowest/ })).length > 0).toBe(isWide)
     // Always one line a call.
     expect((await ui.find({ type: 'Box', key: 'row:g1' }))?.children?.length).toBe(1)
@@ -465,5 +477,60 @@ test('the summary copies as markdown', async ($, on) => {
   expect(md).toMatch(/\| Tool \| Calls \| Avg \| Total \| Tokens \(est\.\) \|\n\| --- \| ---: \| ---: \| ---: \| ---: \|\n/)
   expect(md).toMatch(/\| Bash \(1 failed\) \| 2 \|/)
   expect(md).toMatch(/\*\*Heaviest call:\*\* Bash `echo a \| b 'x'` ~1\.0k tok/)
+  await ui.unmount()
+})
+
+test('the waterfall marks only a failure; the tree marks every status', async ($, on) => {
+  const held = injected()
+  const nodes = (held.nodes as [string, any[]])[1]
+  Object.assign(nodes.find(n => n.id === 'g3'), { status: 'err' })
+  Object.assign(nodes.find(n => n.id === 'g2'), { status: 'run', end: undefined })
+  on('state.get', (_, e) => {
+    const one = held[String(e.key)]
+    return one ? { value: { value: { shape: one[0], value: one[1] }, version: 1 } } : { value: null }
+  })
+
+  // The bar's color says done and running; only the failure has a glyph, after its name.
+  held.mode = ['mode-2', 'waterfall']
+  let ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await ui.findAll({ type: 'Text', text: /^[✓●] $/ })).length).toBe(0)
+  expect((await ui.findAll({ type: 'Text', text: /^ ✗$/ })).length).toBe(1)
+  await ui.unmount()
+
+  held.mode = ['mode-2', 'tree']
+  ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect((await ui.findAll({ type: 'Text', text: /^✓ $/ })).length).toBe(4)
+  expect((await ui.findAll({ type: 'Text', text: /^● $/ })).length).toBe(1)
+  expect((await ui.findAll({ type: 'Text', text: /^✗ $/ })).length).toBe(1)
+  await ui.unmount()
+})
+
+test('the summary collapses to its header, and opens again', async ($, on) => {
+  on('command.register', () => ({ value: { command: 'call-tree' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('clock.every', () => ({ value: null }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('tool.call', () => ({ result: {}, text: 'ok' }))
+  on('turn.complete', (_, e) => ({ text: e.answer ?? '' }))
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'ask', turnId: 'tc' })
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  await $.turn.complete({ turnId: 'tc', reason: 'answer', answer: 'done' } as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const body = () => ui.find({ type: 'Text', text: /^Tokens/ })
+  expect(await body()).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /▾ Summary/ })).toBeDefined()
+
+  await ui.press({ key: 'shut:tc' })
+  expect(await body()).toBeUndefined()
+  expect(await ui.find({ type: 'Text', text: /▸ Summary/ })).toBeDefined()
+  // The header keeps the copy button, so a collapsed summary can still be copied.
+  expect(await ui.find({ type: 'Button', text: /^Copy$/ })).toBeDefined()
+
+  await ui.press({ key: 'shut:tc' })
+  expect(await body()).toBeDefined()
   await ui.unmount()
 })

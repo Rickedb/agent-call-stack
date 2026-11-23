@@ -25,7 +25,24 @@ export function block($: EngineInterface, c: Pane, n: Node, which: 'input' | 'ou
         {isCut ? ` · first ${text.length.toLocaleString()} of ${len.toLocaleString()} characters` : ''}
       </Text>
       <Box backgroundColor="subtle" paddingX={1}>
-        <Text mono>{visible.join('\n')}</Text>
+        <Box flexGrow={1} flexShrink={1}>
+          <Text mono>{visible.join('\n')}</Text>
+        </Box>
+        {/* The copy icon sits in the box's top-right corner, as on a code block of a markdown preview. */}
+        <Box flexShrink={0} paddingLeft={1}>
+          <Button
+            key={`copy:${key}`}
+            plain
+            dimColor
+            onPress={async p => {
+              // The whole text: from its file when the state kept only a cut.
+              const full = file ? await $.fs.read(file).catch(() => text) : text
+              void $.ui.copy({ text: full, surface: p.surface })
+            }}
+          >
+            ⧉
+          </Button>
+        </Box>
       </Box>
       <Box gap={2}>
         {split.length > LINES ? (
@@ -37,17 +54,6 @@ export function block($: EngineInterface, c: Pane, n: Node, which: 'input' | 'ou
             {isOpen ? 'Show less' : `Show all ${split.length} lines`}
           </Button>
         ) : null}
-        <Button
-          key={`copy:${key}`}
-          plain
-          onPress={async p => {
-            // The whole text: from its file when the state kept only a cut.
-            const full = file ? await $.fs.read(file).catch(() => text) : text
-            void $.ui.copy({ text: full, surface: p.surface })
-          }}
-        >
-          {file ? 'Copy all' : 'Copy'}
-        </Button>
         {file ? (
           <Button
             key={`path:${key}`}

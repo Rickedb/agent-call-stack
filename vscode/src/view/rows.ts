@@ -1,6 +1,6 @@
 import type { Node } from '../types'
 import { slowestOf, timesOf } from './context'
-import { clip, dur, esc, icon, mark, sizeOf, span, tint, tokText } from './format'
+import { clip, dur, esc, icon, mark, modelName, sizeOf, span, tint, tokText } from './format'
 import { report } from './report'
 import type { Ctx, Lane, Place } from './types'
 
@@ -43,7 +43,8 @@ export const section = (c: Ctx, top: Node): string => {
   const row = (r: Place): string => {
     const { node, depth, hidden } = r
     const hasKids = (kids.get(node.id) ?? []).length > 0
-    const right = isWaterfall ? `+${dur(node.start - t0)}  ${dur(span(node, v.now))}` : dur(span(node, v.now))
+    // What the call itself took, not the time before it (the bar shows where it started); a prompt's is its total.
+    const right = dur(span(node, v.now))
     const name = node.kind === 'prompt' ? `Prompt ${c.promptNo.get(node.id)}` : node.name
     const id = esc(node.id)
     return `<div class="item">
@@ -57,18 +58,20 @@ export const section = (c: Ctx, top: Node): string => {
           }
           <button class="label" data-act="select" data-id="${id}" title="${esc(clip(node.arg, 400))}">
             <span>${icon(node)}</span>
-            <span class="tint-${tint(node)}">${mark(node)}</span>
+            ${isWaterfall ? '' : `<span class="tint-${tint(node)}">${mark(node)}</span>`}
             <span class="${node.kind === 'tool' ? '' : 'strong'}">${esc(name)}</span>
+            ${isWaterfall && node.status === 'err' ? `<span class="tint-err" title="Failed">${mark(node)}</span>` : ''}
+            ${node.model ? `<span class="model" title="The model this prompt was sent to">${esc(modelName(node.model))}</span>` : ''}
             ${node.arg ? `<span class="dim arg">${esc(clip(node.arg, 160))}</span>` : ''}
             ${hidden ? `<span class="dim">+${hidden}</span>` : ''}
           </button>
           ${node === slowest && rows.length > 3 ? '<span class="warn">slowest</span>' : ''}
           ${
             sizeOf(node, 'output') > 0
-              ? `<span class="dim tok" title="Estimated output tokens (about 4 characters each)">${tokText(node, 'output')}</span>`
+              ? `<span class="badge tok" title="Estimated output tokens (about 4 characters each)">${tokText(node, 'output')}</span>`
               : ''
           }
-          <span class="dim time">${right}</span>
+          <span class="badge time">${right}</span>
         </div>
         ${isWaterfall ? bar(node) : ''}
       </div>`

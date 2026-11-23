@@ -35,6 +35,11 @@ const shown = atom({ plugin: 'ai-call-tree', key: 'shown' } as const, [], {
   shape: 'shown-1',
 })
 
+// The prompts whose summary is collapsed to its header.
+const shut = atom({ plugin: 'ai-call-tree', key: 'shut' } as const, [], {
+  shape: 'shut-1',
+})
+
 const flip = (list: string[], id: string) =>
   list.includes(id) ? list.filter(x => x !== id) : [...list, id]
 
@@ -110,4 +115,12 @@ export function readShown($: EngineInterface) {
 }
 export function toggleShown($: EngineInterface, key: string) {
   return update($, shown, list => flip(list, key))
+}
+
+// The prompts whose summary is collapsed to its header.
+export function readShut($: EngineInterface) {
+  return read($, shut)
+}
+export function toggleShut($: EngineInterface, id: string) {
+  return update($, shut, list => flip(list, id))
 }

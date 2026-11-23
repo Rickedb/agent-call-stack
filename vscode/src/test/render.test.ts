@@ -17,6 +17,7 @@ const view = (over: Partial<View> = {}): View => ({
   selected: '',
   folded: new Set(),
   shown: new Set(),
+  shut: new Set(),
   now: t + 500,
   hooksInstalled: true,
   hooksOff: false,
@@ -76,12 +77,14 @@ test('a session with no prompt keeps the drop-down, so another can be picked', (
   assert.doesNotMatch(renderBody(new Session('a'), view()), /<select/)
 })
 
-test('the waterfall lists each call with its start; the tree has no start offsets', () => {
+test('a row shows what the call itself took, never a start offset; only the waterfall has the bar', () => {
   const s = basic()
   const wf = renderBody(s, view())
   assert.match(wf, /list the files/)
   assert.match(wf, /Bash/)
-  assert.match(wf, /\+\d+ms/)
+  // The time badge: the call's own, not the time elapsed before it. The bar says where it started.
+  assert.match(wf, /<span class="badge time">\d+ms<\/span>/)
+  assert.doesNotMatch(wf, /<span class="badge time">\+/)
   assert.match(wf, /class="track"/)
 
   const tree = renderBody(s, view({ mode: 'tree' }))
@@ -121,7 +124,9 @@ test('a cut text says so and offers the whole', () => {
   const call = s.nodes.find(n => n.name === 'Bash')
   const html = renderBody(s, view({ selected: call?.id ?? '' }))
   assert.match(html, /first 8,000 of 50,000 characters/)
-  assert.match(html, /Copy all/)
+  // The copy is an icon on the code block's corner, and says it copies the whole text.
+  assert.match(html, /<button class="copy-icon" data-act="copy"[^>]*title="Copy the whole text"/)
+  assert.doesNotMatch(html, />Copy all</)
   assert.match(html, /Whole text: \/tmp\/whole\.txt/)
 })
 
@@ -180,7 +185,7 @@ test('each row shows its output tokens, estimated; details show input and output
     const html = renderBody(s, view({ mode }))
     assert.match(html, />~5 tok</)
     // The call still running has no output yet, so no figure.
-    assert.equal(html.match(/class="dim tok"/g)?.length, 1)
+    assert.equal(html.match(/class="badge tok"/g)?.length, 1)
   }
 
   const details = renderBody(s, view({ selected: call?.id ?? '' }))
@@ -325,4 +330,57 @@ test('what a call says cannot break the markdown table or its code', () => {
   )
   const md = summaryMarkdown(s, s.nodes[0]?.id ?? '', t + 500) ?? ''
   assert.match(md, /Heaviest call:\*\* Bash `echo a \| b 'x'`/)
+})
+
+test('the waterfall marks only a failure; the tree marks every status', () => {
+  const s = session(
+    ev({ kind: 'prompt', arg: 'p' }),
+    ev({ kind: 'tool_pre', tool: 'Ok', toolUseId: 'a' }),
+    ev({ kind: 'tool_post', tool: 'Ok', toolUseId: 'a', output: 'x' }),
+    ev({ kind: 'tool_pre', tool: 'Denied', toolUseId: 'b' }),
+    ev({ kind: 'tool_pre', tool: 'Slow', toolUseId: 'c' }),
+    ev({ kind: 'tool_fail', tool: 'Denied', toolUseId: 'b', output: 'no' }),
+  )
+  const wf = renderBody(s, view({ mode: 'waterfall' }))
+  // The bar's color says done and running; the failure keeps its glyph.
+  assert.doesNotMatch(wf, /<span class="tint-tool">✓<\/span>/)
+  assert.doesNotMatch(wf, /<span class="tint-run">●<\/span>/)
+  assert.equal(wf.match(/<span class="tint-err"[^>]*>✗<\/span>/g)?.length, 1)
+  const tree = renderBody(s, view({ mode: 'tree' }))
+  assert.match(tree, /<span class="tint-tool">✓<\/span>/)
+  assert.match(tree, /<span class="tint-run">●<\/span>/)
+  assert.match(tree, /<span class="tint-err">✗<\/span>/)
+})
+
+test('the summary collapses to its header', () => {
+  const s = finished()
+  const top = s.nodes.find(n => n.kind === 'prompt')
+  const open = renderBody(s, view())
+  assert.match(open, /data-act="shut"[^>]*aria-expanded="true"/)
+  assert.match(open, /class="kinds"/)
+  const shut = renderBody(s, view({ shut: new Set([top?.id ?? '']) }))
+  assert.match(shut, /aria-expanded="false"/)
+  assert.match(shut, /▸/)
+  assert.doesNotMatch(shut, /class="kinds"|class="facts"/)
+  // The header, and with it the copy button, stay.
+  assert.match(shut, /Summary/)
+  assert.match(shut, /data-act="copySummary"/)
+})
+
+test('the output size and the time of a row are badges', () => {
+  const html = renderBody(basic(), view())
+  assert.match(html, /<span class="badge tok"[^>]*>~\d+ tok<\/span>/)
+  assert.match(html, /<span class="badge time">/)
+})
+
+test('each text has a copy icon on its code block, and the summary a short Copy', () => {
+  const s = finished()
+  const call = s.nodes.find(n => n.name === 'Read')
+  const html = renderBody(s, view({ selected: call?.id ?? '' }))
+  // The input and the output: an icon each, inside the block, not a text button after it.
+  assert.equal(html.match(/<div class="code">/g)?.length, 2)
+  assert.equal(html.match(/class="copy-icon"/g)?.length, 2)
+  assert.match(html, /<div class="code">\s*<pre>[\s\S]*?<\/pre>\s*<button class="copy-icon" data-act="copy" data-id="[^"]*" data-which="output" title="Copy"/)
+  assert.match(html, /class="i-copy"[\s\S]*class="i-check"/)
+  assert.match(renderBody(s, view()), /data-act="copySummary"[^>]*>Copy<\/button>/)
 })

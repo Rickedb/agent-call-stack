@@ -17,6 +17,7 @@ const view = (over: Partial<View> = {}): View => ({
   selected: '',
   folded: new Set(),
   shown: new Set(),
+  shut: new Set(),
   now: t + 500,
   hooksInstalled: true,
   hooksOff: false,

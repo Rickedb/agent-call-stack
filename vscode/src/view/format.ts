@@ -31,6 +31,10 @@ export const fmtTokens = (n: number): string =>
         ? `${Math.round(n / 1000)}k`
         : `${(n / 1_000_000).toFixed(1)}M`
 
+/** A model id as a person says it: `copilot/gpt-4.1` is `gpt-4.1`, `claude-opus-5-5-20260101` is `opus-5-5`. */
+export const modelName = (m: string): string =>
+  m.replace(/^[^/]+\//, '').replace(/^claude-/, '').replace(/-\d{8}(?=\]|$)/, '')
+
 /** `~340 tok` for a count of estimated tokens. */
 export const tokCount = (tokens: number): string => `~${fmtTokens(tokens)} tok`
 
