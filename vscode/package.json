@@ -1,0 +1,95 @@
+{
+  "name": "ai-call-tree-copilot",
+  "displayName": "AI Call Tree for Copilot",
+  "description": "A live pane showing what GitHub Copilot's agent is doing as a call tree: prompt, subagents, tool calls, with status and duration.",
+  "version": "0.1.0",
+  "publisher": "local",
+  "license": "UNLICENSED",
+  "private": true,
+  "engines": {
+    "vscode": "^1.95.0"
+  },
+  "categories": [
+    "AI",
+    "Chat",
+    "Visualization"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "aiCallTree",
+          "title": "Call Tree",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "aiCallTree": [
+        {
+          "type": "webview",
+          "id": "aiCallTree.view",
+          "name": "Call Tree"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "aiCallTree.open",
+        "title": "Open Call Tree",
+        "category": "Call Tree"
+      },
+      {
+        "command": "aiCallTree.installHooks",
+        "title": "Install Copilot Hooks",
+        "category": "Call Tree"
+      },
+      {
+        "command": "aiCallTree.uninstallHooks",
+        "title": "Remove Copilot Hooks",
+        "category": "Call Tree"
+      },
+      {
+        "command": "aiCallTree.clear",
+        "title": "Clear Recorded Calls",
+        "category": "Call Tree"
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "ai-call-tree.calltree",
+        "name": "calltree",
+        "description": "Show the call tree of the current Copilot session as text"
+      }
+    ],
+    "configuration": {
+      "title": "AI Call Tree",
+      "properties": {
+        "aiCallTree.defaultView": {
+          "type": "string",
+          "enum": [
+            "tree",
+            "waterfall"
+          ],
+          "default": "waterfall",
+          "description": "How the rows draw at first: a tree of duration bars, or a waterfall on a time axis."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "watch": "tsc -p . --watch",
+    "test": "tsc -p . && node --test out/test/",
+    "package": "npm run build && npx @vscode/vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "1.95.0",
+    "typescript": "^5.6.0"
+  }
+}

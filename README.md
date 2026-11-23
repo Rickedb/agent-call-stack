@@ -18,6 +18,10 @@ Stack (innermost first)
 
 The pane opens at session start. Run `/call-tree` to open it again.
 
+## GitHub Copilot / VS Code
+
+The [`vscode/`](vscode/README.md) folder is a port for GitHub Copilot in VS Code: a hook script that records the agent's events, and an extension that draws the same pane.
+
 ## Develop
 
 Validate and type-check:
