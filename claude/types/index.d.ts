@@ -8,10 +8,54 @@ export type Usage = {
   cacheWrite: number
 }
 
+/** What the engine decided about letting a tool call run, and what came of it. */
+export type Perm = {
+  decision: 'allow' | 'ask' | 'deny'
+  /** The reason the engine or a hook gave. */
+  reason?: string
+  /** The settings rule that decided, as written (`Bash(git push:*)`). */
+  rule?: string
+  /** What else decided: the classic hook event, the setting, or the plugin. */
+  by?: string
+  /** For an ask: the person did not let it run (or a classifier refused it). */
+  refused?: true
+  /** For an ask that was answered yes: how long the call waited for the answer, in milliseconds. */
+  waited?: number
+  /** How long the tool itself ran, as the engine reports it (the wait and the hooks are not in it). Kept for an ask. */
+  ran?: number
+}
+
+/** One compaction of the conversation: what it was told, what it left. */
+export type Compact = {
+  /** `manual` (the person's /compact), `auto` (at the threshold) or `plugin`. */
+  trigger: string
+  /** The conversation's size before and after, in tokens, when the engine says. */
+  before?: number
+  after?: number
+  /** The messages the conversation had before, and after. */
+  messagesBefore?: number
+  messagesAfter?: number
+  /** What the summarizing request cost, as the API reported it. */
+  usage?: Usage
+  /** Why a mod or the engine skipped it. */
+  skipped?: string
+}
+
+/** What a tool call touched, read from its arguments. */
+export type Touch = {
+  /** `read`, `edit` (change a file) and `write` (create or replace one) touch files; `run` a command; `search` and `web` look something up. */
+  op: 'read' | 'edit' | 'write' | 'other' | 'run' | 'search' | 'web'
+  /** The files it was given (for a search, where it looked). */
+  paths: string[]
+  /** The command it ran, the address it fetched, what it searched for. */
+  what?: string
+}
+
 export type Node = {
   id: string
   parent?: string
-  kind: 'prompt' | 'agent' | 'tool'
+  /** A row that is neither work nor a loop but something that happened to it: a compaction, an error. */
+  kind: 'prompt' | 'agent' | 'tool' | 'event'
   /** The short name: a tool's, an agent's type, `Prompt`. */
   name: string
   /** What it was given, in a few words: a command, a path, a task. */
@@ -37,6 +81,16 @@ export type Node = {
   usage?: Usage
   /** A duration the history did record, in milliseconds (an agent's). */
   ms?: number
+  /** Why a prompt, a subagent or an event ended badly, in a few words (`interrupted`, `rate limited`). */
+  why?: string
+  /** The engine's permission verdict for a tool call, and what came of it. */
+  perm?: Perm
+  /** For a compaction row. */
+  compact?: Compact
+  /** What a tool call touched. */
+  touch?: Touch
+  /** The file the conversation's transcript is kept in: the session's for a prompt, a subagent's own for it. */
+  transcript?: string
 }
 
 declare module 'claude-code' {
@@ -46,7 +100,7 @@ declare module 'claude-code' {
       /** The id of the prompt now running (or last run). */
       root: Shaped<string>
       /** How the rows draw: a tree of duration bars, or a waterfall on a time axis. */
-      mode: Shaped<'tree' | 'waterfall'>
+      mode: Shaped<'tree' | 'waterfall' | 'files'>
       /** The row whose details show; '' for none. */
       selected: Shaped<string>
       /** The ids of the rows whose children are folded away. */

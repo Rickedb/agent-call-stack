@@ -70,3 +70,20 @@ export const tokText = (n: Node, which: 'input' | 'output') => {
 // reminders) is not a prompt.
 export const userText = (t: string) =>
   t.replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, '').trim()
+
+// What the API calls an error, as a person says it.
+const FAILURES: Record<string, string> = {
+  authentication_failed: 'sign-in failed',
+  oauth_org_not_allowed: 'organization not allowed',
+  account_on_hold: 'account on hold',
+  verification_required: 'verification required',
+  billing_error: 'billing error',
+  rate_limit: 'rate limited',
+  overloaded: 'API overloaded',
+  invalid_request: 'invalid request',
+  model_not_found: 'model not found',
+  server_error: 'server error',
+  max_output_tokens: 'hit the output limit',
+  cloud_credential_error: 'cloud credentials failed',
+}
+export const failureWord = (error: string) => FAILURES[error] ?? error.replace(/_/g, ' ')

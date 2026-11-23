@@ -18,7 +18,8 @@ export const renderText = (s: Session | undefined, now: number): string => {
   const line = (n: Node) => {
     const name = n.kind === 'prompt' ? `Prompt ${prompts.indexOf(n) + 1}` : n.name
     const arg = n.arg && n.kind !== 'prompt' ? `(${clip(n.arg, 60)})` : n.kind === 'prompt' ? ` ${clip(n.arg, 60)}` : ''
-    return `${icon(n)} ${mark(n)} ${name}${n.model ? ` [${modelName(n.model)}]` : ''}${arg}`
+    const why = (n.kind === 'prompt' || n.kind === 'agent') && n.why ? ` [${clip(n.why, 40)}]` : ''
+    return `${icon(n)} ${mark(n)} ${name}${n.model ? ` [${modelName(n.model)}]` : ''}${why}${arg}`
   }
   const size = (n: Node) => (sizeOf(n, 'output') > 0 ? `  ${tokText(n, 'output')}` : '')
 
@@ -52,6 +53,11 @@ export const renderText = (s: Session | undefined, now: number): string => {
     }
     if (r.slowest) out.push(`  average ${dur(r.avg)} a tool call, slowest ${named(r.slowest)} ${took(r.slowest)}`)
     if (r.heaviest) out.push(`  heaviest ${named(r.heaviest)} ${tokCount(r.heavy)}`)
+    if (r.compacts) out.push(`  compactions: ${r.compacts.count}`)
+    for (const f of r.errors.slice(0, 5)) {
+      out.push(`  error: ${f.node.kind === 'prompt' ? 'the prompt' : named(f.node)} — ${f.why}`)
+    }
+    if (r.errors.length > 5) out.push(`  …and ${r.errors.length - 5} more errors`)
     out.push(`  tokens (estimated): in ${tokCount(r.input)}, out ${tokCount(r.output)}, total ${tokCount(r.input + r.output)}`)
   }
   return out.join('\n')

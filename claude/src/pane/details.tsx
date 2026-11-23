@@ -6,6 +6,7 @@ import { modelOf } from '../stats'
 import { clearSelected } from '../state'
 import { block } from './block'
 import type { Pane } from './context'
+import { compactLine, permLine } from './tags'
 import { mark, tint } from './theme'
 
 // What opens under a row: its state, timing, sizes, and its input and output.
@@ -45,8 +46,25 @@ export function details($: EngineInterface, c: Pane, n: Node, t0: number, t1: nu
             {`reported in ${tokExact(n.usage.input + n.usage.cacheRead + n.usage.cacheWrite)} (${tokExact(n.usage.cacheRead)} cached) · out ${tokExact(n.usage.output)} ${n.kind === 'prompt' ? '· subagents not included' : ''}`.trim()}
           </Text>
         ) : null}
-        {model ? <Text dimColor>{`${n.model ? 'model' : 'called by'} ${modelName(model)}`}</Text> : null}
+        {model && n.kind !== 'event' ? <Text dimColor>{`${n.model ? 'model' : 'called by'} ${modelName(model)}`}</Text> : null}
+        {n.why ? <Text color="error">{`why: ${n.why}`}</Text> : null}
+        {n.perm ? <Text dimColor>{permLine(n.perm)}</Text> : null}
+        {n.compact ? <Text dimColor>{compactLine(n.compact)}</Text> : null}
       </Box>
+      {n.transcript ? (
+        <Box gap={1}>
+          <Box flexShrink={1} overflow="hidden">
+            <Text dimColor wrap="truncate-start">{`transcript ${n.transcript}`}</Text>
+          </Box>
+          <Button
+            key={`copy-transcript:${n.id}`}
+            plain
+            onPress={p => void $.ui.copy({ text: n.transcript ?? '', surface: p.surface })}
+          >
+            Copy transcript path
+          </Button>
+        </Box>
+      ) : null}
       {block($, c, n, 'input')}
       {block($, c, n, 'output')}
       <Button key="close" role="dismiss" onPress={() => void clearSelected($)}>

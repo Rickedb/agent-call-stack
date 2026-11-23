@@ -6,6 +6,7 @@ import { bar } from './bar'
 import { cellsOf, WIDE } from './cells'
 import type { Pane, Place, Section } from './context'
 import { details } from './details'
+import { tagOf } from './tags'
 import { mark, tint } from './theme'
 
 // One row: the tree guides and fold arrow, a status glyph, name and argument,
@@ -34,7 +35,8 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
   const room =
     c.cols - lead - markW - (isSlowest ? 8 : 0) - tokCol - timeCol - barCol - 1
   const model = node.model ? modelName(node.model) : ''
-  const arg = clip(node.arg, room - name.length - (model ? model.length + 1 : 0) - 1)
+  const tag = tagOf(node)
+  const arg = clip(node.arg, room - name.length - (model ? model.length + 1 : 0) - (tag ? tag.text.length + 1 : 0) - 1)
 
   return (
     <Box flexDirection="column">
@@ -67,11 +69,12 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
           <Box flexGrow={1} flexShrink={1} overflow="hidden">
             <Button key={`open:${node.id}`} plain onPress={() => void toggleSelected($, node.id)}>
               {c.isWaterfall ? null : <Text color={tint(node)}>{mark(node)} </Text>}
-              <Text bold={isPicked || node.kind !== 'tool'} wrap="truncate-end">
+              <Text bold={isPicked || (node.kind !== 'tool' && node.kind !== 'event')} wrap="truncate-end">
                 {name}
               </Text>
               {c.isWaterfall && isFailed ? <Text color="error">{` ${mark(node)}`}</Text> : null}
               {model ? <Text color="permission">{` ${model}`}</Text> : null}
+              {tag ? <Text color={tag.color}>{` ${tag.text}`}</Text> : null}
               {arg ? (
                 <Text dimColor wrap="truncate-end">
                   {` ${arg}`}

@@ -20,9 +20,11 @@ export const block = (c: Ctx, n: Node, which: 'input' | 'output'): string => {
   const isOpen = c.v.shown.has(key)
   const visible = isOpen ? split : split.slice(0, LINES)
   const isCut = len > text.length
+  // A compaction's input is what it was told to keep.
+  const label = n.kind === 'event' && n.name === 'Compact' && which === 'input' ? 'INSTRUCTIONS' : which === 'input' ? 'INPUT' : 'OUTPUT'
   const attrs = `data-id="${esc(n.id)}" data-which="${which}"`
   return `<div class="block">
-      <div class="dim">${which === 'input' ? 'INPUT' : 'OUTPUT'}${
+      <div class="dim">${label}${
         isCut ? ` · first ${text.length.toLocaleString('en-US')} of ${len.toLocaleString('en-US')} characters` : ''
       }</div>
       <div class="code">

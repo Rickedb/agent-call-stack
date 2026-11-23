@@ -1,5 +1,5 @@
 import type { Node } from './types'
-import { sizeOf } from './view/format'
+import { clip, sizeOf } from './view/format'
 
 /** One kind of tool: how often it ran, how long it took, how much text went through it. */
 export type Kind = {
@@ -14,6 +14,12 @@ export type Kind = {
   /** Estimated tokens in and out of its calls. */
   tokens: number
 }
+
+/** A row that went wrong, and what the record says of why. */
+export type Fail = { node: Node; why: string }
+
+/** The compactions of a prompt: Copilot's hook says when and what set it off, nothing of the size. */
+export type Compacts = { count: number; manual: number; auto: number }
 
 /** What a finished prompt did, worked out from its rows. */
 export type Report = {
@@ -37,6 +43,37 @@ export type Report = {
   agents: { count: number; failed: number; ms: number; longest?: Node }
   /** The models the prompt ran on (one, for now: Copilot names none for a subagent). */
   models: { model: string; main: boolean; agents: number }[]
+  /** Every row under it that failed, and the prompt itself if it did, in the order they happened. */
+  errors: Fail[]
+  /** Undefined when nothing was compacted. */
+  compacts?: Compacts
+}
+
+/** Time some call was running: the calls' spans merged, so overlaps count once. */
+export const busyOf = (top: Node, calls: Node[], now: number): number => {
+  const end = top.end ?? now
+  let busy = 0
+  let from = -Infinity
+  let to = -Infinity
+  for (const n of [...calls].sort((a, b) => a.start - b.start)) {
+    const s = Math.max(n.start, top.start)
+    const e = Math.min(n.end ?? end, end)
+    if (e <= s) continue
+    if (s > to) {
+      if (to > from) busy += to - from
+      from = s
+      to = e
+    } else to = Math.max(to, e)
+  }
+  if (to > from) busy += to - from
+  return busy
+}
+
+/** Why a row failed, in a line: what it said when it ended, else the first line of its error. */
+export const whyOf = (n: Node): string => {
+  if (n.why) return n.why
+  const line = (n.output ?? '').split('\n').find(l => l.trim())
+  return line ? clip(line, 140) : 'failed'
 }
 
 /** The model a row ran on: its own, else its nearest ancestor's (a tool call is the loop's). */
@@ -59,7 +96,9 @@ export const reportOf = (top: Node, below: Node[], now: number): Report | undefi
   if (top.status === 'run') return undefined
   const tools = below.filter(n => n.kind === 'tool')
   const agents = below.filter(n => n.kind === 'agent')
-  if (tools.length + agents.length === 0) return undefined
+  const events = below.filter(n => n.kind === 'event')
+  // A prompt that did nothing but fail or compact still has something to say.
+  if (tools.length + agents.length + events.length === 0 && !top.why) return undefined
 
   const took = (n: Node) => (n.end as number) - n.start
   const byName = new Map<string, Node[]>()
@@ -87,22 +126,8 @@ export const reportOf = (top: Node, below: Node[], now: number): Report | undefi
   const weight = (n: Node) => tok(n, 'input') + tok(n, 'output')
   const heaviest = [...calls].sort((a, b) => weight(b) - weight(a))[0]
 
-  // Time some call was running: the calls' spans merged, so overlaps count once.
   const end = top.end ?? now
-  let busy = 0
-  let from = -Infinity
-  let to = -Infinity
-  for (const n of [...calls].sort((a, b) => a.start - b.start)) {
-    const s = Math.max(n.start, top.start)
-    const e = Math.min(n.end ?? end, end)
-    if (e <= s) continue
-    if (s > to) {
-      if (to > from) busy += to - from
-      from = s
-      to = e
-    } else to = Math.max(to, e)
-  }
-  if (to > from) busy += to - from
+  const busy = busyOf(top, calls, now)
 
   const models: Report['models'] = []
   for (const n of [top, ...agents]) {
@@ -116,6 +141,18 @@ export const reportOf = (top: Node, below: Node[], now: number): Report | undefi
     else one.agents++
   }
   const agentDone = agents.filter(n => n.end !== undefined)
+
+  const errors: Fail[] = [...(top.status === 'err' ? [top] : []), ...below.filter(n => n.status === 'err')]
+    .sort((a, b) => a.start - b.start)
+    .map(node => ({ node, why: whyOf(node) }))
+  const compacted = events.filter(n => n.name === 'Compact')
+  const compacts: Compacts | undefined = compacted.length
+    ? {
+        count: compacted.length,
+        manual: compacted.filter(n => n.compact?.trigger === 'manual').length,
+        auto: compacted.filter(n => n.compact?.trigger === 'auto').length,
+      }
+    : undefined
   return {
     calls: tools.length,
     failed: tools.filter(n => n.status === 'err').length,
@@ -135,5 +172,7 @@ export const reportOf = (top: Node, below: Node[], now: number): Report | undefi
       longest: [...agentDone].sort((a, b) => took(b) - took(a))[0],
     },
     models,
+    errors,
+    compacts,
   }
 }

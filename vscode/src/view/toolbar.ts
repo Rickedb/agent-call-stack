@@ -50,17 +50,18 @@ export const toolbar = (c: Ctx): string => {
   const isAllFolded = foldable.length > 0 && foldable.every(id => v.folded.has(id))
   return `<div class="bar">
       <div class="seg">
-        ${button('mode', 'Tree', 'data-v="tree"', c.isWaterfall ? '' : 'primary')}
+        ${button('mode', 'Tree', 'data-v="tree"', c.isWaterfall || c.isFiles ? '' : 'primary')}
         ${button('mode', 'Waterfall', 'data-v="waterfall"', c.isWaterfall ? 'primary' : '')}
+        ${button('mode', 'Touched', 'data-v="files" title="The files, commands and lookups of each prompt"', c.isFiles ? 'primary' : '')}
       </div>
       ${picker(v)}
-      ${foldable.length ? button('foldAll', isAllFolded ? 'unfold all' : 'fold all', '', 'plain') : ''}
+      ${foldable.length && !c.isFiles ? button('foldAll', isAllFolded ? 'unfold all' : 'fold all', '', 'plain') : ''}
     </div>`
 }
 
 // How many prompts, and how many calls run, are done or failed.
 export const summary = (c: Ctx): string => {
-  const everyCall = c.prompts.flatMap(p => c.below(p))
+  const everyCall = c.prompts.flatMap(p => c.below(p)).filter(n => n.kind !== 'event')
   const total = {
     ok: everyCall.filter(n => n.status === 'ok').length,
     err: everyCall.filter(n => n.status === 'err').length,

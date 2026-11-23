@@ -3,7 +3,7 @@ import type { EngineInterface } from 'claude-code'
 import { setFolded, setMode } from '../state'
 import type { Pane } from './context'
 
-// The buttons above the rows: Tree or Waterfall, and fold all.
+// The buttons above the rows: Tree, Waterfall or Touched, and fold all.
 export function toolbar($: EngineInterface, c: Pane) {
   const { Box, Button } = c.els
   const foldable = c.list.filter(n => (c.kids.get(n.id) ?? []).length > 0).map(n => n.id)
@@ -13,7 +13,7 @@ export function toolbar($: EngineInterface, c: Pane) {
       <Box gap={1}>
         <Button
           key="view-tree"
-          variant={c.isWaterfall ? 'secondary' : 'primary'}
+          variant={c.isWaterfall || c.isFiles ? 'secondary' : 'primary'}
           onPress={() => void setMode($, 'tree')}
         >
           Tree
@@ -25,8 +25,15 @@ export function toolbar($: EngineInterface, c: Pane) {
         >
           Waterfall
         </Button>
+        <Button
+          key="view-files"
+          variant={c.isFiles ? 'primary' : 'secondary'}
+          onPress={() => void setMode($, 'files')}
+        >
+          Touched
+        </Button>
       </Box>
-      {foldable.length ? (
+      {foldable.length && !c.isFiles ? (
         <Button
           key="fold-all"
           plain
@@ -43,7 +50,7 @@ export function toolbar($: EngineInterface, c: Pane) {
 // How many prompts, and how many calls run, are done or failed.
 export const summary = (c: Pane) => {
   const { Box, Text } = c.els
-  const everyCall = c.prompts.flatMap(p => c.below(p))
+  const everyCall = c.prompts.flatMap(p => c.below(p)).filter(n => n.kind !== 'event')
   const total = {
     ok: everyCall.filter(n => n.status === 'ok').length,
     err: everyCall.filter(n => n.status === 'err').length,

@@ -20,6 +20,7 @@ Stack (innermost first)
 | --- | --- | --- |
 | Claude Code | [`claude/`](claude/README.md) | A Claude Code mod: hooks on the engine's events and a pane beside the chat. |
 | GitHub Copilot in VS Code | [`vscode/`](vscode/README.md) | A hook script that records the agent's events, and an extension that draws the same pane. |
+| Claude Code in VS Code | [`claude-vscode/`](claude-vscode/README.md) | The same idea for Claude Code's VS Code extension: a hook script records Claude Code's events, and a separate extension draws the pane and reads the model and token counts from Claude Code's transcript. |
 
 The targets keep the same features; what differs is listed in [AGENTS.md](AGENTS.md), which is also the rule for changing any of them.
 

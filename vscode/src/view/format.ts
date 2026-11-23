@@ -44,8 +44,9 @@ export const tokText = (n: Node, which: 'input' | 'output'): string => {
   return len > 0 ? `~${fmtTokens(Math.ceil(len / 4))} tok` : '—'
 }
 
-const KIND_ICON: Record<Node['kind'], string> = { prompt: '💬', agent: '🤖', tool: '🔧' }
-export const icon = (n: Node): string => KIND_ICON[n.kind]
+const KIND_ICON = { prompt: '💬', agent: '🤖', tool: '🔧' } as const
+export const icon = (n: Node): string =>
+  n.kind === 'event' ? (n.name === 'Compact' ? '🗜️' : '⚠️') : KIND_ICON[n.kind]
 export const mark = (n: Node): string => (n.status === 'run' ? '●' : n.status === 'ok' ? '✓' : '✗')
 export const statusWord = (n: Node): string => (n.status === 'run' ? 'Running' : n.status === 'ok' ? 'Done' : 'Failed')
 

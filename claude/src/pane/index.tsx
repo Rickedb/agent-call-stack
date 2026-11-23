@@ -5,6 +5,7 @@ import { PANE } from '../config'
 import { readFolded, readMode, readNodes, readSelected, readShown, readShut } from '../state'
 import type { Pane as Draw } from './context'
 import { section } from './section'
+import { touched } from './touched'
 import { summary, toolbar } from './toolbar'
 import { widget } from './widget'
 
@@ -37,13 +38,15 @@ export const pane = (on: On) => {
       const below = (n: Node): Node[] => (kids.get(n.id) ?? []).flatMap(c => [c, ...below(c)])
 
       const gutter = 2
-      const isWaterfall = (await readMode($)) === 'waterfall'
+      const mode = await readMode($)
+      const isWaterfall = mode === 'waterfall'
       const c: Draw = {
         els,
         list,
         prompts,
         pick: await readSelected($),
         isWaterfall,
+        isFiles: mode === 'files',
         fold: new Set(await readFolded($)),
         whole: new Set(await readShown($)),
         shut: new Set(await readShut($)),
@@ -72,7 +75,7 @@ export const pane = (on: On) => {
                   {'─'.repeat(cols)}
                 </Text>
               ) : null}
-              {section($, c, top)}
+              {c.isFiles ? touched($, c, top) : section($, c, top)}
             </Box>
           ))}
         </Box>

@@ -14,7 +14,7 @@ export function section($: EngineInterface, c: Pane, top: Node) {
   const t0 = top.start
   const t1 = Math.max(1000, ...all.map(n => (n.hist ? c.span(n) : (n.end ?? c.now) - t0)))
   const slowest = all
-    .filter(n => n.kind !== 'prompt' && n.status !== 'run')
+    .filter(n => n.kind !== 'prompt' && n.kind !== 'event' && n.status !== 'run')
     .sort((a, b) => c.span(b) - c.span(a))[0]
 
   // Each row with its place in the tree: for each level above it, whether that

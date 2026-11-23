@@ -6,7 +6,7 @@ import * as vscode from 'vscode'
 
 import { ChatModelReader } from './chatmodels'
 import { collapseOlder } from './collapse'
-import { hookFile, installHookFile, installRecorder, removeHookFile } from './hooks'
+import { hookFile, installHookFile, installRecorder, refreshHookFile, removeHookFile } from './hooks'
 import type { Session } from './model'
 import { foldableIds, isRunning, renderBody, renderText, summaryMarkdown } from './render'
 import { EventStore } from './store'
@@ -28,7 +28,7 @@ const hooksInstalled = () =>
 class CallTreeView implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView
   private timer?: NodeJS.Timeout
-  private mode: 'tree' | 'waterfall'
+  private mode: 'tree' | 'waterfall' | 'files'
   private selected = ''
   private picked = ''
   private folded = new Set<string>()
@@ -43,7 +43,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
     private store: EventStore,
   ) {
     this.mode =
-      ctx.globalState.get<'tree' | 'waterfall'>('mode') ??
+      ctx.globalState.get<'tree' | 'waterfall' | 'files'>('mode') ??
       vscode.workspace.getConfiguration('aiCallTree').get<'tree' | 'waterfall'>('defaultView', 'waterfall')
     // A new prompt folds the ones before it; what history there is, folds but the latest.
     collapseOlder(store.model.sessions.values(), this.seen, this.folded)
@@ -133,7 +133,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
       case 'ready':
         break
       case 'mode':
-        this.mode = m.v === 'tree' ? 'tree' : 'waterfall'
+        this.mode = m.v === 'tree' ? 'tree' : m.v === 'files' ? 'files' : 'waterfall'
         void this.ctx.globalState.update('mode', this.mode)
         break
       case 'select':
@@ -180,6 +180,12 @@ class CallTreeView implements vscode.WebviewViewProvider {
         }
         return
       }
+      case 'copyTranscript': {
+        if (!node?.transcript) return
+        await vscode.env.clipboard.writeText(node.transcript)
+        void vscode.window.setStatusBarMessage('Call tree: transcript path copied', 2000)
+        return
+      }
       case 'copy':
       case 'copyPath': {
         if (!node || !m.which) break
@@ -209,7 +215,11 @@ export function activate(ctx: vscode.ExtensionContext): void {
   // The recorder the hooks run is a copy; keep it as new as the extension.
   if (hooksInstalled()) {
     try {
-      installRecorder(recorderSource, dataDir())
+      const recorder = installRecorder(recorderSource, dataDir())
+      // ...and the hook files list every event it records.
+      for (const f of [hookFile('user'), ...workspaceFolders().map(w => hookFile('workspace', w))]) {
+        if (f) refreshHookFile(f, recorder)
+      }
     } catch {
       // The copy there keeps working.
     }

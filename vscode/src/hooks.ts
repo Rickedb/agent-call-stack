@@ -13,6 +13,8 @@ export const EVENTS = [
   'SubagentStart',
   'SubagentStop',
   'Stop',
+  'PreCompact',
+  'ErrorOccurred',
 ] as const
 
 export const HOOK_FILE = 'ai-call-tree.json'
@@ -56,6 +58,18 @@ export const installRecorder = (source: string, dataDir: string): string => {
 export const installHookFile = (file: string, recorder: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true })
   fs.writeFileSync(file, JSON.stringify(buildHookConfig(recorder), null, 2) + '\n')
+}
+
+/**
+ * Brings a hook file this extension wrote up to the events it listens to now, so that an update
+ * that listens to more (a compaction, an error) needs no reinstall. Says whether it changed one.
+ */
+export const refreshHookFile = (file: string, recorder: string): boolean => {
+  if (!fs.existsSync(file)) return false
+  const next = JSON.stringify(buildHookConfig(recorder), null, 2) + '\n'
+  if (fs.readFileSync(file, 'utf8') === next) return false
+  fs.writeFileSync(file, next)
+  return true
 }
 
 /** Removes a hook file this extension wrote; says whether there was one. */

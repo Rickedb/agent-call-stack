@@ -46,6 +46,28 @@ Click a row to open its details in a modal over the view: its state, timing, tok
 
 Each row shows the size of its output in tokens (`~340 tok`, hover for what it means), and a row's details show both the input and the output. These are estimates, at four characters a token, from the whole text: Copilot's hooks give no token counts. The Claude Code mod shows the same figures, estimated the same way.
 
+## Touched view
+
+The **Touched** button beside Tree and Waterfall swaps the rows for what each prompt touched, short, from what each call was given (so it works while the prompt runs):
+
+- **Files**: one line per file, the changed ones first: what was done to it (`R2 E1`: reads, edits, `W` for writes), the calls' time and estimated tokens added up, `✗` for failures, and two flags the agents' own file lists do not give: `re-read 2×` (read again with nothing written to it in between) and `retried 1×` (the same thing tried again right after a failure). Under it, its calls in order as buttons (`read_file 120ms`, `replace_string_in_file 80ms ✗`), each opening its details in the modal. A call that touched several files shows under each. Paths show under the directory they share, named in the heading.
+- **Commands**: each command run, with how many times (`×3`), failures, time and tokens; whitespace does not tell two apart.
+- **Lookups**: searches and fetches, grouped the same way.
+- **Time**: how long calls ran of the prompt's time, the rest being the model's own and other waits (including your approvals, which Copilot's hooks cannot tell apart).
+
+What a call touched is read from its arguments by the tool's name and the shape of its arguments (`filePath`, `command`, `url`, a list of replacements...), which Copilot's tool names make a heuristic: a tool the recorder does not recognize by name still lists the files it was given, as touched in some way (`·`). A call that touches nothing of these is not listed. Only calls recorded after this update have it (older logs show nothing in this view). Prompts fold with their arrow; over twelve files or eight commands, the rest are counted in a line.
+
+## Errors and compactions
+
+- **Errors.** An `ErrorOccurred` event is an `Error` row under what was running, with the message in its name and, in its details, the error's name, its context (`model_call`, `tool_execution`, `system`, `user_input`), whether it was recoverable, and the stack. It does not fail the prompt: the host may go on. A session that ends while a prompt runs (`SessionEnd` with `abort`, `error` or `timeout`) fails the prompt, with `interrupted`, `session error` or `timed out` in red after its name. A failed call keeps its error as its output. The summary lists every failure (the prompt, subagents, calls, with the first line of each error), five at most.
+- **Compactions.** A `PreCompact` event is a `Compact` row under what was running, with its trigger (`manual` or `auto`) and the instructions it was given. The hook fires before the compaction and nothing fires after, so the row is an instant: no length, no size before and after, no summary. The summary of the prompt counts them.
+
+Neither counts as a call in the totals. After an update the extension rewrites the hook files it wrote, so the two events are recorded without a reinstall. VS Code's own docs list `PreCompact` but not `ErrorOccurred`; if errors never show up, VS Code does not fire it.
+
+## Transcript
+
+Copilot's hooks name the file the chat's transcript is kept in, on a turn's end (`Stop`), a subagent's start and stop, and a compaction. The row's details show that path, with a button that copies it. A running prompt has none yet, and not every host sends it. The extension only shows the path: the file's format is Copilot's own and is not read.
+
 ## Summary of a finished prompt
 
 When a prompt has finished and made at least one call, a summary ends its rows (not while it runs, when it is folded, or for a prompt read back from history):
@@ -55,6 +77,7 @@ When a prompt has finished and made at least one call, a summary ends its rows (
 - **Average**, **slowest** and **heaviest** call (the one that moved the most text, in plus out).
 - **Tokens**: in (the prompt and every call's input), out (the answer and every call's output) and the total. Estimates, as above: Copilot's hooks give no token counts. `@calltree` ends with the same figures as text.
 - **Subagents**: how many, how many failed, and the longest. They are not counted as tool calls, and their time overlaps their own calls.
+- **Compacts** and **Error** lines, as in the section above.
 
 The summary collapses to its header with a click on `▾ Summary` (`▸` when collapsed); the copy button stays in the header. It is remembered until the window reloads.
 
@@ -78,6 +101,8 @@ Other commands: **Remove Copilot Hooks**, **Clear Recorded Calls**. Setting `aiC
 
 - **Tokens are all estimates.** The Claude Code mod shows what the API reported for a prompt and each subagent, and the cache split; Copilot's hooks carry no usage.
 - **The model is read, not given.** Copilot's hooks carry no model, so a prompt's is read from VS Code's own chat log (`chatSessions/<session id>.jsonl` beside the workspace's storage), the model each request was sent to, and matched to the prompts the hooks saw by order from the newest end. It is shown after the prompt's name, in a call's details ("called by"), and in the summary. That file's format is VS Code's own and not documented, so it can change under us; when the model is not found (or the chat is `auto` and says only that), nothing is shown. A subagent has no model of its own here.
+- **No permission verdicts.** The Claude Code mod tags a call that was asked about, denied or not allowed, and tells the person's wait from the tool's run time. Copilot's hooks carry no verdict, so a call that waits for you to approve it shows the wait as part of its time.
+- **Thinner errors and compactions.** No API error kind, no refusal category, no reply cut off at a limit; a compaction has its trigger and instructions but no size, no length, no summary.
 - **No history backfill.** The mod read the chat's earlier messages when it loaded. Here only what happens after the hooks are installed is recorded (the log does survive reloads, so earlier recorded sessions come back).
 - **Call pairing is best effort.** Some Copilot hosts give tool calls no id. Then a result is paired with its call by tool and arguments, oldest first, which can swap two identical parallel calls.
 - **Subagents.** Copilot's start event may carry no subagent id. Calls inside a subagent are bound to the oldest subagent still waiting for one. The built-in `general-purpose` agent may fire no start/stop events at all (per GitHub's docs), and then it is not drawn.
@@ -86,13 +111,14 @@ Other commands: **Remove Copilot Hooks**, **Clear Recorded Calls**. Setting `aiC
 
 ## Layout
 
-Besides the panel, `src/chatmodels.ts` reads the model of each prompt from VS Code's chat log and `src/stats.ts` works out the summary's numbers.
+Besides the panel, `src/chatmodels.ts` reads the model of each prompt from VS Code's chat log, `src/stats.ts` works out the summary's numbers, and `src/touched.ts` those of the Touched view (what a call touched is read in `src/record.ts`).
 
 The panel's drawing is one file a concern in `src/view/`, with `src/render.ts` as its one door:
 
 ```
 src/view/index.ts     renderBody: toolbar, counts, a section per prompt (newest first), the modal
 src/view/rows.ts      a prompt's rows: guide lines, bars
+src/view/touched.ts   the Touched view: a prompt's files, commands and lookups (numbers from src/touched.ts)
 src/view/report.ts    the summary of a finished prompt (numbers from src/stats.ts)
 src/view/markdown.ts  the summary as markdown, for its copy button
 src/view/modal.ts     a row's details in the modal

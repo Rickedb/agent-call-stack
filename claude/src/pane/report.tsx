@@ -1,7 +1,7 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { Node } from '../../types'
-import { clip, dur, modelName, tokCount, tokExact } from '../format'
+import { clip, dur, fmtTokens, modelName, tokCount, tokExact } from '../format'
 import { reportOf, type Report } from '../stats'
 import { toggleShut } from '../state'
 import type { Pane } from './context'
@@ -9,6 +9,7 @@ import { reportMarkdown } from './markdown'
 import { tint } from './theme'
 
 const MAX_KINDS = 8
+const MAX_ERRORS = 5
 const pct = (a: number, b: number) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0)
 const named = (n: Node) => `${n.name}${n.arg ? ` ${n.arg}` : ''}`
 
@@ -59,6 +60,8 @@ export function report($: EngineInterface, c: Pane, top: Node) {
       ? `${r.agents.count} ${r.agents.count === 1 ? 'subagent' : 'subagents'}${r.agents.failed ? ` (${r.agents.failed} failed)` : ''}${r.agents.longest ? ` · longest ${named(r.agents.longest)} ${dur(r.agents.longest.end! - r.agents.longest.start)}` : ''}`
       : '',
   ].filter(Boolean)
+  const who = (n: Node) => (n.kind === 'prompt' ? 'the prompt' : named(n))
+  const shownErrors = r.errors.slice(0, MAX_ERRORS)
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={tint(top)} paddingX={1} marginTop={1}>
@@ -127,6 +130,25 @@ export function report($: EngineInterface, c: Pane, top: Node) {
           : null}
         {r.usage ? line('Call text', `in ${tokCount(r.input)} · out ${tokCount(r.output)} (estimated, what the calls were given and returned)`) : null}
         {facts.map(f => line('Subagents', f))}
+        {r.perms
+          ? line(
+              'Approvals',
+              `${r.perms.allowed} allowed · ${r.perms.asked} asked you${r.perms.waited ? ` (waited ${dur(r.perms.waited)})` : ''}${r.perms.denied ? ` · ${r.perms.denied} not allowed` : ''}`,
+            )
+          : null}
+        {r.compacts
+          ? line(
+              'Compacts',
+              `${r.compacts.count}${r.compacts.manual || r.compacts.auto ? ` (${[r.compacts.manual ? `${r.compacts.manual} manual` : '', r.compacts.auto ? `${r.compacts.auto} auto` : ''].filter(Boolean).join(', ')})` : ''}${r.compacts.before !== undefined && r.compacts.after !== undefined ? ` · ${fmtTokens(r.compacts.before)} → ${fmtTokens(r.compacts.after)} tok` : ''}${r.compacts.saved ? ` · ${fmtTokens(r.compacts.saved)} tok saved` : ''} · took ${dur(r.compacts.ms)}`,
+            )
+          : null}
+        {shownErrors.map(f => (
+          <Text mono wrap="truncate">
+            <Text color="error">{'Error'.padEnd(10)}</Text>
+            {clip(`${who(f.node)} — ${f.why}`, room - 10)}
+          </Text>
+        ))}
+        {r.errors.length > shownErrors.length ? <Text dimColor>{`+${r.errors.length - shownErrors.length} more errors`}</Text> : null}
       </Box>
       )}
     </Box>

@@ -1,5 +1,5 @@
 import type { Node } from '../../types'
-import { clip, dur, modelName, tokCount, tokExact } from '../format'
+import { clip, dur, fmtTokens, modelName, tokCount, tokExact } from '../format'
 import type { Report } from '../stats'
 
 // Table cells and inline code must not break the markdown around them.
@@ -46,6 +46,26 @@ export const reportMarkdown = (title: string, top: Node, r: Report): string => {
     out.push(
       `- **Subagents:** ${a.count}${a.failed ? ` (${a.failed} failed)` : ''}${a.longest ? ` · longest ${call(a.longest)} ${took(a.longest)}` : ''}`,
     )
+  }
+
+  if (r.perms) {
+    const p = r.perms
+    out.push(
+      `- **Approvals:** ${p.allowed} allowed · ${p.asked} asked the person${p.waited ? ` (waited ${dur(p.waited)})` : ''}${p.denied ? ` · ${p.denied} not allowed` : ''}`,
+    )
+  }
+  if (r.compacts) {
+    const k = r.compacts
+    out.push(
+      `- **Compactions:** ${k.count}${k.manual || k.auto ? ` (${[k.manual ? `${k.manual} manual` : '', k.auto ? `${k.auto} auto` : ''].filter(Boolean).join(', ')})` : ''}${k.before !== undefined && k.after !== undefined ? ` · ${fmtTokens(k.before)} → ${fmtTokens(k.after)} tok` : ''}${k.saved ? ` · ${fmtTokens(k.saved)} tok saved` : ''} · took ${dur(k.ms)}`,
+    )
+  }
+  if (r.errors.length) {
+    out.push(`- **Errors:** ${r.errors.length}`)
+    for (const f of r.errors.slice(0, 10)) {
+      out.push(`  - ${f.node.kind === 'prompt' ? 'the prompt' : call(f.node)} — ${cell(f.why)}`)
+    }
+    if (r.errors.length > 10) out.push(`  - …and ${r.errors.length - 10} more`)
   }
 
   if (r.kinds.length) {

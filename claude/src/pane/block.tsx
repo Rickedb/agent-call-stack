@@ -14,6 +14,15 @@ export function block($: EngineInterface, c: Pane, n: Node, which: 'input' | 'ou
   const len = (which === 'input' ? n.inputLen : n.outputLen) ?? text.length
   const file = which === 'input' ? n.inputFile : n.outputFile
   const key = `${n.id}:${which}`
+  // A compaction's input is what it was told to keep, its output the summary it left.
+  const label =
+    n.kind === 'event' && n.name === 'Compact'
+      ? which === 'input'
+        ? 'INSTRUCTIONS'
+        : 'SUMMARY'
+      : which === 'input'
+        ? 'INPUT'
+        : 'OUTPUT'
   const split = text.split('\n')
   const isOpen = c.whole.has(key)
   const visible = isOpen ? split : split.slice(0, LINES)
@@ -21,7 +30,7 @@ export function block($: EngineInterface, c: Pane, n: Node, which: 'input' | 'ou
   return (
     <Box flexDirection="column">
       <Text dimColor>
-        {which === 'input' ? 'INPUT' : 'OUTPUT'}
+        {label}
         {isCut ? ` · first ${text.length.toLocaleString()} of ${len.toLocaleString()} characters` : ''}
       </Text>
       <Box backgroundColor="subtle" paddingX={1}>

@@ -14,7 +14,7 @@ import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 
-import type { Ev, EvKind } from './types'
+import type { Ev, EvKind, Touch } from './types'
 
 /** What the log keeps of one text. Longer text goes whole to a file. */
 export const KEEP = 8000
@@ -116,6 +116,72 @@ export const resultText = (v: unknown): string => {
   return String(v)
 }
 
+// The argument names tools use for the files they take, across the tools of both agents.
+const PATH_KEYS = new Set([
+  'file_path',
+  'filePath',
+  'notebook_path',
+  'notebookPath',
+  'path',
+  'file',
+  'filepath',
+  'uri',
+  'paths',
+  'files',
+  'filePaths',
+])
+
+const oneLine = (v: unknown): string | undefined =>
+  typeof v === 'string' && v.trim() && !v.includes('\n') && v.length <= 400 ? v.replace(/^file:\/\//, '') : undefined
+
+// Every file path a call was given, however deep the tool nests them (an edit list, a list of files).
+const pathsIn = (args: Rec): string[] => {
+  const out: string[] = []
+  const walk = (v: unknown, named: boolean, depth: number) => {
+    if (depth > 3) return
+    if (Array.isArray(v)) return v.forEach(x => walk(x, named, depth + 1))
+    if (isRec(v)) {
+      for (const [k, x] of Object.entries(v)) walk(x, PATH_KEYS.has(k), depth + 1)
+      return
+    }
+    const s = named ? oneLine(v) : undefined
+    if (s) out.push(s)
+  }
+  for (const [k, v] of Object.entries(args)) walk(v, PATH_KEYS.has(k), 0)
+  return [...new Set(out)]
+}
+
+// What a search looked for: the first of these arguments that is a line of text.
+const WHAT = ['pattern', 'query', 'glob', 'includePattern', 'url', 'prompt']
+const whatOf = (args: Rec): string => {
+  for (const k of WHAT) {
+    const v = args[k]
+    if (typeof v === 'string' && v.trim()) return clip(v, 200)
+    if (Array.isArray(v) && typeof v[0] === 'string') return clip(v.join(' '), 200)
+  }
+  return ''
+}
+
+/**
+ * What a tool call touched, read from its arguments: the files it was given, the command it ran,
+ * the address it fetched, what it searched for. By the tool's name and the shape of its arguments,
+ * so that it works for tools it has not seen. Undefined for a call that touched none of these.
+ */
+export const touchOf = (tool: string, args: Rec): Touch | undefined => {
+  const name = tool.toLowerCase()
+  if (typeof args.command === 'string' && args.command.trim()) return { op: 'run', paths: [], what: args.command }
+  if (/web_?fetch|web_?search|fetch_webpage/.test(name) || typeof args.url === 'string' || Array.isArray(args.urls)) {
+    return { op: 'web', paths: [], what: whatOf(args) }
+  }
+  if (/grep|glob|search|find|(^|_)ls$|list/.test(name)) return { op: 'search', paths: pathsIn(args), what: whatOf(args) }
+  const paths = pathsIn(args)
+  if (!paths.length) return undefined
+  if (/(^|[_-])(read|view|open|cat)([_-]|$)/.test(name)) return { op: 'read', paths }
+  if (/create|write|new_file/.test(name)) return { op: 'write', paths }
+  if (/edit|replace|insert|patch|apply|notebook|rename|move|delete|remove/.test(name)) return { op: 'edit', paths }
+  return { op: 'other', paths }
+}
+
 // Tools that start a subagent. The subagent is drawn from its own start event;
 // this call only lends it a description and a prompt.
 const SPAWN_TOOLS = new Set(['runsubagent', 'run_subagent', 'agent', 'task'])
@@ -134,6 +200,8 @@ const KINDS: Record<string, EvKind> = {
   posttoolusefailure: 'tool_fail',
   subagentstart: 'agent_start',
   subagentstop: 'agent_stop',
+  erroroccurred: 'error',
+  precompact: 'compact',
 }
 
 // The chat's own commands are not work worth drawing.
@@ -164,6 +232,9 @@ export const normalize = (event: string, p: Rec, now: number): Ev | null => {
   const cwd = str(p.cwd)
   if (cwd) ev.cwd = cwd
   if (agentId) ev.agentId = agentId
+  // Only some events carry it: a turn's end, a subagent's start and stop, a compaction.
+  const transcript = str(first(p, 'transcript_path', 'transcriptPath'))
+  if (transcript) ev.transcript = transcript
   const parent = str(first(p, 'parent_agent_id', 'parentAgentId'))
   if (parent) ev.parentAgentId = parent
   const type = str(first(p, 'agent_type', 'agentType', 'agent_name', 'agentName'))
@@ -175,6 +246,39 @@ export const normalize = (event: string, p: Rec, now: number): Ev | null => {
       if (SELF.test(text)) return null
       ev.arg = clip(text || '(continued turn)', 160)
       ev.input = text
+      break
+    }
+    case 'session_end': {
+      const reason = str(p.reason)
+      if (reason) ev.reason = reason
+      break
+    }
+    case 'error': {
+      // `error` is an object (message, name, stack), or only a string.
+      const err = p.error
+      const message = isRec(err) ? (str(err.message) ?? '') : (str(err) ?? '')
+      const name = isRec(err) ? str(err.name) : undefined
+      const stack = isRec(err) ? str(err.stack) : undefined
+      const context = str(first(p, 'error_context', 'errorContext'))
+      const recoverable = first(p, 'recoverable')
+      ev.arg = clip(message || name || 'error', 160)
+      if (context) ev.reason = context
+      ev.output = [
+        name && message ? `${name}: ${message}` : message || name || '',
+        context ? `context: ${context}` : '',
+        typeof recoverable === 'boolean' ? `recoverable: ${recoverable ? 'yes' : 'no'}` : '',
+        stack ?? '',
+      ]
+        .filter(Boolean)
+        .join('\n')
+      break
+    }
+    case 'compact': {
+      const trigger = str(p.trigger)
+      if (trigger) ev.reason = trigger
+      ev.arg = trigger ?? ''
+      const instructions = str(first(p, 'custom_instructions', 'customInstructions'))
+      if (instructions) ev.input = instructions
       break
     }
     case 'stop':
@@ -200,7 +304,11 @@ export const normalize = (event: string, p: Rec, now: number): Ev | null => {
         if (kind === 'tool_pre') ev.input = String(args.prompt ?? describe(args))
       } else {
         ev.arg = summarize(args)
-        if (kind === 'tool_pre') ev.input = describe(args)
+        if (kind === 'tool_pre') {
+          ev.input = describe(args)
+          const touch = touchOf(tool, args)
+          if (touch) ev.touch = touch
+        }
       }
       if (kind === 'tool_post') {
         ev.output = resultText(first(p, 'tool_response', 'tool_result', 'toolResult', 'toolResponse'))

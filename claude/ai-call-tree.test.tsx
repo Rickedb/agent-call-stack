@@ -1,6 +1,9 @@
 import { expect, test } from 'claude-code/testing'
 
+import { settle } from './src/nodes'
 import { modelOf, reportOf } from './src/stats'
+import { touchOf } from './src/touch'
+import { commonDir, touchedOf } from './src/touched'
 
 const PANE = {
   plugin: 'ai-call-tree',
@@ -532,5 +535,326 @@ test('the summary collapses to its header, and opens again', async ($, on) => {
 
   await ui.press({ key: 'shut:tc' })
   expect(await body()).toBeDefined()
+  await ui.unmount()
+})
+
+const quiet = (on: (...a: any[]) => unknown) => {
+  on('command.register', () => ({ value: { command: 'call-tree' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('clock.every', () => ({ value: null }))
+  on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
+  on('turn.start', (_: unknown, e: any) => ({ turnId: e.turnId }))
+  on('turn.complete', (_: unknown, e: any) => ({ text: e.answer ?? '' }))
+  // The classic hooks the engine raises beneath the mod.
+  for (const name of ['classic.StopFailure', 'classic.PostCompact', 'classic.PostToolUse', 'classic.PostToolUseFailure', 'classic.PermissionDenied', 'classic.Stop', 'classic.SubagentStop']) {
+    on(name, () => ({}))
+  }
+}
+
+test('a prompt that did not end in an answer says why, and the summary lists every error', async ($, on) => {
+  quiet(on)
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'max_tokens', usage: null } as never
+  })
+  on('tool.call', () => ({ isError: true, result: 'x', text: 'npm ERR! missing script: build\nmore' }) as never)
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'build it', turnId: 'er' })
+  // The model's reply was cut off.
+  for await (const _ of $.turn.step({ turnId: 'er', index: 0, model: 'claude-opus-5-5' } as never)) void _
+  await $.tool.call({ tool: 'Bash', command: 'npm run build' })
+  // The API said no, and the turn ended.
+  await $.classic.StopFailure({ error: 'rate_limit', error_details: 'try again later' } as never)
+  await $.turn.complete({ turnId: 'er', reason: 'error', answer: '' } as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  // The prompt carries why, as a tag after its name.
+  expect(await ui.find({ type: 'Text', text: /^ rate limited: try again later$/ })).toBeDefined()
+  // The cut-off reply is a row of its own, a failed one.
+  expect(await ui.find({ type: 'Button', text: /Error.*the reply hit the output limit/ })).toBeDefined()
+  // The summary lists each: the call with the first line of its error, and the prompt with its reason.
+  expect(await ui.find({ type: 'Text', text: /Error\s+Bash npm run build — npm ERR! missing script: build/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Error\s+the prompt — rate limited: try again later/ })).toBeDefined()
+  await ui.press({ key: 'open:er' })
+  expect(await ui.find({ type: 'Text', text: /why: rate limited: try again later/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('an interrupted prompt and a refused one say so', async ($, on) => {
+  quiet(on)
+  on('tool.call', () => ({ result: {}, text: 'ok' }))
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'first', turnId: 'i1' })
+  await $.turn.complete({ turnId: 'i1', reason: 'aborted', isAborted: true, answer: '' } as never)
+  await $.turn.start({ text: 'second', turnId: 'i2' })
+  await $.turn.complete({
+    turnId: 'i2',
+    reason: 'refusal',
+    answer: '',
+    refusal: { category: 'cyber', explanation: 'not something I can help with' },
+  } as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /^ interrupted$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^ refused \(cyber\): not something/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a compaction is a row under the prompt, with what it kept and the summary it left', async ($, on) => {
+  quiet(on)
+  on('tool.call', () => ({ result: {}, text: 'ok' }))
+  on('session.compact', () => ({
+    messages: [{ role: 'user', text: 'summary', toolUses: [] }],
+    tokensBefore: 180_000,
+    tokensAfter: 12_000,
+    usage: { input_tokens: 90_000, output_tokens: 3_000, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+  }))
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'long work', turnId: 'cp' })
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  const msg = (text: string) => ({ role: 'user', text, toolUses: [] }) as never
+  await $.session.compact({ trigger: 'auto', instructions: 'keep the plan', messages: [msg('a'), msg('b'), msg('c')] } as never)
+  await $.classic.PostCompact({ trigger: 'auto', compact_summary: 'The user asked for long work.' } as never)
+  await $.turn.complete({ turnId: 'cp', reason: 'answer', answer: 'done' } as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Button', text: /Compact.*auto · 180k → 12k tok/ })).toBeDefined()
+  // The summary adds it up.
+  expect(await ui.find({ type: 'Text', text: /Compacts\s+1 \(1 auto\) · 180k → 12k tok · 168k tok saved/ })).toBeDefined()
+  // It is no tool call.
+  expect(await ui.find({ type: 'Text', text: /1 tool calls/ })).toBeDefined()
+
+  const row = await ui.find({ type: 'Button', text: /Compact/ })
+  await ui.press({ key: row?.key ?? '' })
+  expect(await ui.find({ type: 'Text', text: /auto · 180k → 12k tok \(−93%\) · 3 → 1 messages · summarizer in 90k tok · out 3\.0k tok \(reported\)/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^INSTRUCTIONS/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /keep the plan/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^SUMMARY/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /The user asked for long work\./ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a precomputed compaction is not a row', async ($, on) => {
+  quiet(on)
+  on('session.compact', () => ({ messages: [{ role: 'user', text: 'a', toolUses: [] }], tokensBefore: 10, tokensAfter: 5 }))
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'ask', turnId: 'pc' })
+  await $.session.compact({ trigger: 'precompute', messages: [{ role: 'user', text: 'a', toolUses: [] }] } as never)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Button', text: /Compact/ })).toBeUndefined()
+  await ui.unmount()
+})
+
+test('a call the engine asks about, with nobody to answer, is not allowed', async ($, on) => {
+  quiet(on)
+  on('tool.check', () => ({ decision: 'ask', reason: 'Bash needs approval', rule: 'Bash(npm:*)' }))
+  on('tool.call', () => ({ result: {}, text: 'ok' }))
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'ask', turnId: 'pm' })
+  await $.tool.call({ tool: 'Bash', command: 'npm test' })
+  await $.turn.complete({ turnId: 'pm', reason: 'answer', answer: 'done' } as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /^ not allowed$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Approvals\s+0 allowed · 1 asked you · 1 not allowed/ })).toBeDefined()
+  const row = await ui.find({ type: 'Button', text: /Bash/ })
+  await ui.press({ key: row?.key ?? '' })
+  expect(await ui.find({ type: 'Text', text: /permission asked you, not allowed · rule Bash\(npm:\*\) · Bash needs approval/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('an allowed ask is drawn from when the tool ran, and says how long it waited', () => {
+  const was = { id: 't', kind: 'tool' as const, name: 'Bash', arg: '', status: 'run' as const, start: 1000, perm: { decision: 'ask' as const, ran: 150 } }
+  // Asked at 1000, answered, the tool ran 150ms and ended at 6150: it waited 5s.
+  expect(settle(was, false, 6150)).toEqual({ start: 6000, perm: { decision: 'ask', ran: 150, waited: 5000 } })
+  // A run longer than the whole call (clocks differ) never moves the start back.
+  expect(settle(was, false, 1100)).toEqual({ start: 1000, perm: { decision: 'ask', ran: 150, waited: 0 } })
+  // An ask that failed without the tool running was not allowed.
+  expect(settle({ ...was, perm: { decision: 'ask' as const } }, true, 2000)).toEqual({ perm: { decision: 'ask', refused: true } })
+  // A call that was not asked is left as it is.
+  expect(settle({ ...was, perm: { decision: 'allow' as const } }, false, 2000)).toEqual({})
+  expect(settle(undefined, false, 2000)).toEqual({})
+})
+
+test('a call the engine denies is tagged denied', async ($, on) => {
+  quiet(on)
+  on('tool.check', () => ({ decision: 'deny', reason: 'no pushing', rule: 'Bash(git push:*)' }))
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'push', turnId: 'pd' })
+  await $.tool.call({ tool: 'Bash', command: 'git push' })
+  await $.turn.complete({ turnId: 'pd', reason: 'answer', answer: 'done' } as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /^ denied$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Error\s+Bash git push — / })).toBeDefined()
+  await ui.unmount()
+})
+
+test('the summary lists errors, compactions and approvals from the rows', () => {
+  const top = { id: 'p', kind: 'prompt' as const, name: 'Prompt', arg: '', status: 'err' as const, start: 0, end: 10_000, why: 'interrupted' }
+  const row = (id: string, kind: 'tool' | 'event', name: string, over = {}) =>
+    ({ id, parent: 'p', kind, name, arg: '', status: 'ok' as const, start: 100, end: 200, ...over })
+  const below = [
+    row('a', 'tool', 'Bash', { perm: { decision: 'allow' } }),
+    row('b', 'tool', 'Bash', { perm: { decision: 'ask', waited: 4000 } }),
+    row('c', 'tool', 'Edit', { status: 'err', output: 'no such file\nat line 3', perm: { decision: 'ask', refused: true } }),
+    row('d', 'tool', 'Bash', { status: 'err', perm: { decision: 'deny', rule: 'Bash(rm:*)', reason: 'nope' } }),
+    row('e', 'event', 'Compact', { compact: { trigger: 'manual', before: 100_000, after: 20_000 }, start: 500, end: 2500 }),
+    row('f', 'event', 'Compact', { compact: { trigger: 'auto', before: 90_000, after: 30_000 }, start: 3000, end: 3500 }),
+    row('g', 'event', 'Compact', { compact: { trigger: 'auto', skipped: 'a hook said no' } }),
+  ]
+  const r = reportOf(top, below, 20_000)!
+  // Events are no tool calls.
+  expect(r.calls).toBe(4)
+  expect(r.errors.map(f => [f.node.id, f.why])).toEqual([
+    ['p', 'interrupted'],
+    ['c', 'not allowed'],
+    ['d', 'denied by Bash(rm:*): nope'],
+  ])
+  expect(r.perms).toEqual({ allowed: 1, asked: 2, denied: 2, waited: 4000 })
+  expect(r.compacts).toMatchObject({ count: 2, manual: 1, auto: 1, saved: 140_000, before: 100_000, after: 30_000, ms: 2500 })
+  // A prompt that only failed still has a summary.
+  expect(reportOf(top, [], 20_000)?.errors).toHaveLength(1)
+  expect(reportOf({ ...top, why: undefined, status: 'ok' as const }, [], 20_000)).toBeUndefined()
+})
+
+test('a prompt and a subagent say where their transcript is kept, and it copies', async ($, on) => {
+  quiet(on)
+  on('agent.spawn', () => ({ model: 'claude-haiku-5-5', agentId: 'ag1' }))
+  on('tool.call', () => ({ result: {}, text: 'ok' }))
+  const copied: string[] = []
+  on('ui.copy', (_, e) => {
+    copied.push(e.text)
+    return { value: { ok: true } } as never
+  })
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'ask', turnId: 'tp' })
+  await $.agent.spawn({ prompt: 'look', description: 'look around', subagentType: 'Explore' } as never)
+  await $.classic.SubagentStop({ agent_id: 'ag1', agent_type: 'Explore', agent_transcript_path: '/t/agent-ag1.jsonl' } as never)
+  await $.classic.Stop({ transcript_path: '/t/session.jsonl' } as never)
+  await $.turn.complete({ turnId: 'tp', reason: 'answer', answer: 'done' } as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'open:tp' })
+  expect(await ui.find({ type: 'Text', text: /transcript \/t\/session\.jsonl/ })).toBeDefined()
+  await ui.press({ key: 'copy-transcript:tp' })
+  expect(copied.at(-1)).toBe('/t/session.jsonl')
+  await ui.press({ key: 'close' })
+
+  await ui.press({ key: 'open:a:ag1' })
+  expect(await ui.find({ type: 'Text', text: /transcript \/t\/agent-ag1\.jsonl/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('what a call touched is read from its arguments, whatever the tool is called', () => {
+  // Claude Code's tools.
+  expect(touchOf('Read', { file_path: '/p/a.ts' })).toEqual({ op: 'read', paths: ['/p/a.ts'] })
+  expect(touchOf('Edit', { file_path: '/p/a.ts', old_string: 'x', new_string: 'y' })).toEqual({ op: 'edit', paths: ['/p/a.ts'] })
+  expect(touchOf('Write', { file_path: '/p/new.ts', content: 'x' })?.op).toBe('write')
+  expect(touchOf('NotebookEdit', { notebook_path: '/p/n.ipynb' })?.op).toBe('edit')
+  expect(touchOf('Bash', { command: 'npm test' })).toEqual({ op: 'run', paths: [], what: 'npm test' })
+  expect(touchOf('Grep', { pattern: 'login', path: '/p/src' })).toEqual({ op: 'search', paths: ['/p/src'], what: 'login' })
+  expect(touchOf('Glob', { pattern: '**/*.ts' })).toEqual({ op: 'search', paths: [], what: '**/*.ts' })
+  expect(touchOf('WebFetch', { url: 'https://x.dev/a', prompt: 'summarize' })).toEqual({ op: 'web', paths: [], what: 'https://x.dev/a' })
+  expect(touchOf('WebSearch', { query: 'tsc noEmit' })?.op).toBe('web')
+  // Copilot's, which name and shape them differently.
+  expect(touchOf('read_file', { filePath: '/p/a.ts', startLine: 1 })).toEqual({ op: 'read', paths: ['/p/a.ts'] })
+  expect(touchOf('replace_string_in_file', { filePath: '/p/a.ts' })?.op).toBe('edit')
+  expect(touchOf('create_file', { filePath: '/p/b.ts' })?.op).toBe('write')
+  expect(touchOf('run_in_terminal', { command: 'ls', explanation: 'x' })?.op).toBe('run')
+  expect(touchOf('semantic_search', { query: 'where is login' })).toEqual({ op: 'search', paths: [], what: 'where is login' })
+  expect(touchOf('list_dir', { path: '/p' })).toEqual({ op: 'search', paths: ['/p'], what: '' })
+  expect(touchOf('fetch_webpage', { urls: ['https://a.dev', 'https://b.dev'], query: 'q' })?.op).toBe('web')
+  // Files nested in a list, and a file:// address.
+  expect(
+    touchOf('multi_replace_string_in_file', { replacements: [{ filePath: '/p/a.ts', oldString: 'x' }, { filePath: '/p/b.ts' }, { filePath: '/p/a.ts' }] })?.paths,
+  ).toEqual(['/p/a.ts', '/p/b.ts'])
+  expect(touchOf('get_errors', { filePaths: ['file:///p/a.ts'] })).toEqual({ op: 'other', paths: ['/p/a.ts'] })
+  // Nothing touched: no files, no command.
+  expect(touchOf('TodoWrite', { todos: [{ content: 'x' }] })).toBeUndefined()
+  expect(touchOf('Read', { file_path: 'a\nb' })).toBeUndefined()
+})
+
+test('the files, commands and lookups of a prompt, with re-reads, retries, time and waits', () => {
+  const top = { id: 'p', kind: 'prompt' as const, name: 'Prompt', arg: '', status: 'ok' as const, start: 0, end: 20_000 }
+  const call = (id: string, name: string, start: number, end: number, touch: any, over: object = {}) =>
+    ({ id, parent: 'p', kind: 'tool' as const, name, arg: '', status: 'ok' as const, start, end, inputLen: 40, outputLen: 400, touch, ...over })
+  const read = (path: string) => ({ op: 'read', paths: [path] })
+  const below = [
+    call('1', 'Read', 0, 1000, read('/p/src/a.ts')),
+    call('2', 'Read', 1500, 2000, read('/p/src/a.ts')),
+    call('3', 'Edit', 2500, 3000, { op: 'edit', paths: ['/p/src/a.ts'] }, { status: 'err' as const }),
+    call('4', 'Edit', 3500, 4500, { op: 'edit', paths: ['/p/src/a.ts'] }),
+    call('5', 'Read', 5000, 5500, read('/p/src/a.ts')),
+    call('6', 'Read', 6000, 6500, read('/p/lib/b.ts')),
+    call('7', 'Bash', 7000, 9000, { op: 'run', paths: [], what: 'npm test' }, { perm: { decision: 'ask', waited: 1500 } }),
+    call('8', 'Bash', 10_000, 11_000, { op: 'run', paths: [], what: 'npm  test' }, { status: 'err' as const }),
+    call('9', 'Grep', 12_000, 12_500, { op: 'search', paths: ['/p'], what: 'login' }),
+    call('x', 'TodoWrite', 13_000, 13_100, undefined),
+  ]
+  const t = touchedOf(top, below, 30_000)
+  // The changed file first, then the other.
+  expect(t.files.map(f => f.path)).toEqual(['/p/src/a.ts', '/p/lib/b.ts'])
+  const a = t.files[0]!
+  expect([a.reads, a.edits, a.writes, a.calls.length, a.failed]).toEqual([3, 2, 0, 5, 1])
+  // The second read repeats the first (nothing written between); the one after the edits does not.
+  expect(a.rereads).toBe(1)
+  // The second edit came right after a failed one.
+  expect(a.retries).toBe(1)
+  expect(a.ms).toBe(1000 + 500 + 500 + 1000 + 500)
+  expect([t.edited, t.readOnly]).toEqual([1, 1])
+  // Whitespace does not tell two commands apart.
+  expect(t.commands.map(g => [g.what, g.calls.length, g.failed, g.ms])).toEqual([['npm test', 2, 1, 3000]])
+  expect(t.lookups.map(g => [g.kind, g.what])).toEqual([['search', 'login']])
+  expect(t.waited).toBe(1500)
+  expect(t.wall).toBe(20_000)
+  // A call that touched nothing is not here.
+  expect(t.files.flatMap(f => f.calls).some(n => n.id === 'x')).toBe(false)
+  expect(commonDir(['/p/src/a.ts', '/p/lib/b.ts'])).toBe('/p')
+  expect(commonDir(['/p/src/a.ts'])).toBe('/p/src')
+  expect(commonDir([])).toBe('')
+})
+
+test('the Touched view lists files, commands and lookups, and a call opens its details', async ($, on) => {
+  quiet(on)
+  on('tool.call', () => ({ result: {}, text: 'ok' }))
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'fix login', turnId: 'tv' })
+  await $.tool.call({ tool: 'Read', file_path: '/p/src/login.ts' } as never)
+  await $.tool.call({ tool: 'Edit', file_path: '/p/src/login.ts', old_string: 'a', new_string: 'b' } as never)
+  await $.tool.call({ tool: 'Read', file_path: '/p/src/util.ts' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'npm test' } as never)
+  await $.tool.call({ tool: 'Grep', pattern: 'login', path: '/p' } as never)
+  await $.turn.complete({ turnId: 'tv', reason: 'answer', answer: 'done' } as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'view-files' })
+  expect(await ui.find({ type: 'Text', text: /2 files \(1 changed, 1 read only\) · 1 command · 1 lookup/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /calls ran .* of .* · model and other time/ })).toBeDefined()
+  // Paths are shown under the directory they share.
+  expect(await ui.find({ type: 'Text', text: /^FILES · under …\/p\/src/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^login\.ts$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^R1 E1$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^util\.ts$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^COMMANDS/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^npm test$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^LOOKUPS/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^Grep login$/ })).toBeDefined()
+
+  // The calls that touched login.ts are buttons: Read, then Edit.
+  const calls = (await ui.findAll({ type: 'Button' })).filter(b => b.key?.startsWith('pick:'))
+  expect(calls.length).toBeGreaterThanOrEqual(5)
+  const edit = await ui.find({ type: 'Button', text: /^Edit \d+ms$/ })
+  await ui.press({ key: edit?.key ?? '' })
+  expect(await ui.find({ type: 'Text', text: /file_path: \/p\/src\/login\.ts/ })).toBeDefined()
+  await ui.press({ key: 'close' })
+
+  // The other views are one press away.
+  await ui.press({ key: 'view-tree' })
+  expect(await ui.find({ type: 'Button', text: /Edit/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^FILES/ })).toBeUndefined()
   await ui.unmount()
 })

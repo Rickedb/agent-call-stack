@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
-import type { Node, Usage } from '../types'
+import type { Node, Perm, Usage } from '../types'
 import { FILE_MAX, KEEP, MAX_NODES } from './config'
 
 export const upsert = (list: Node[], node: Node): Node[] => {
@@ -20,6 +20,26 @@ export const addUsage = (
   cacheRead: (was?.cacheRead ?? 0) + u.cache_read_input_tokens,
   cacheWrite: (was?.cacheWrite ?? 0) + u.cache_creation_input_tokens,
 })
+
+// Adds to what is known of a call's permission; with none known yet, it was asked unless said otherwise.
+export const patchPerm = (list: Node[], id: string, fields: Partial<Perm>): Node[] =>
+  list.map(n => (n.id === id ? { ...n, perm: { decision: 'ask', ...n.perm, ...fields } } : n))
+
+// What a finished call changes about its row beyond its status and text. A call the person was
+// asked about waited for the answer, and that wait is not the tool's time: the row is drawn from
+// when the tool ran (`perm.ran`, which the engine reports), and says how long it waited. An ask
+// that ended in failure with no run was not allowed.
+export const settle = (was: Node | undefined, failed: boolean, end: number): Partial<Node> => {
+  const perm = was?.perm
+  if (!was || perm?.decision !== 'ask') return {}
+  if (perm.ran !== undefined) {
+    return {
+      start: Math.max(was.start, end - perm.ran),
+      perm: { ...perm, waited: Math.max(0, end - was.start - perm.ran) },
+    }
+  }
+  return failed ? { perm: { ...perm, refused: true } } : {}
+}
 
 export const patch = (list: Node[], id: string, fields: Partial<Node>): Node[] =>
   list.map(n => (n.id === id ? { ...n, ...fields } : n))
@@ -54,7 +74,7 @@ export async function keep(
 
 // Recording must never get in the way of the work: a failure is said in a
 // toast, and the call goes on.
-export async function guard($: EngineInterface, what: string, fn: () => Promise<void>) {
+export async function guard($: EngineInterface, what: string, fn: () => Promise<unknown>) {
   try {
     await fn()
   } catch (err) {

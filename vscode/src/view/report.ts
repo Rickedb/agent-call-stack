@@ -4,6 +4,7 @@ import { button, clip, dur, esc, modelName, tint, tokCount } from './format'
 import type { Ctx } from './types'
 
 const MAX_KINDS = 8
+const MAX_ERRORS = 5
 const pct = (a: number, b: number) => (b > 0 ? Math.min(100, Math.round((a / b) * 100)) : 0)
 const named = (n: Node) => `${n.name}${n.arg ? ` ${n.arg}` : ''}`
 
@@ -30,8 +31,8 @@ export const report = (c: Ctx, top: Node): string => {
       ${r.kinds.length > shown.length ? `<div class="dim">+${r.kinds.length - shown.length} more tools</div>` : ''}`
     : ''
 
-  const fact = (label: string, text: string, extra = '') =>
-    `<div class="fact"><span class="dim">${label}</span><span class="val" title="${esc(text)}">${esc(clip(text, 160))}</span>${extra}</div>`
+  const fact = (label: string, text: string, extra = '', cls = 'dim') =>
+    `<div class="fact"><span class="${cls}">${label}</span><span class="val" title="${esc(text)}">${esc(clip(text, 160))}</span>${extra}</div>`
   const took = (n: Node) => (n.end ?? c.v.now) - n.start
   const a = r.agents
 
@@ -40,6 +41,14 @@ export const report = (c: Ctx, top: Node): string => {
     r.slowest ? fact('Slowest', `${named(r.slowest)}  ${dur(took(r.slowest))}`) : '',
     r.heaviest ? fact('Heaviest', `${named(r.heaviest)}  ${tokCount(r.heavy)}`) : '',
     r.models.length ? fact('Models', r.models.map(m => modelName(m.model)).join(' · ')) : '',
+    ...(r.compacts
+      ? [
+          fact(
+            'Compacts',
+            `${r.compacts.count}${r.compacts.manual || r.compacts.auto ? ` (${[r.compacts.manual ? `${r.compacts.manual} manual` : '', r.compacts.auto ? `${r.compacts.auto} auto` : ''].filter(Boolean).join(', ')})` : ''}`,
+          ),
+        ]
+      : []),
     fact('Tokens', `in ${tokCount(r.input)} · out ${tokCount(r.output)} · total ${tokCount(r.input + r.output)} (estimated)`),
     a.count
       ? fact(
@@ -47,6 +56,10 @@ export const report = (c: Ctx, top: Node): string => {
           `${a.count} ${a.count === 1 ? 'subagent' : 'subagents'}${a.failed ? ` (${a.failed} failed)` : ''}${a.longest ? ` · longest ${named(a.longest)} ${dur(took(a.longest))}` : ''}`,
         )
       : '',
+    ...r.errors
+      .slice(0, MAX_ERRORS)
+      .map(f => fact('Error', `${f.node.kind === 'prompt' ? 'the prompt' : named(f.node)} — ${f.why}`, '', 'tint-err')),
+    r.errors.length > MAX_ERRORS ? `<div class="dim">+${r.errors.length - MAX_ERRORS} more errors</div>` : '',
   ].join('')
 
   return `<div class="report tint-${tint(top)}-border">

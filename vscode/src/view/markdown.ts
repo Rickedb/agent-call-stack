@@ -30,6 +30,20 @@ export const reportMarkdown = (title: string, top: Node, r: Report, now: number)
     )
   }
 
+  if (r.compacts) {
+    const k = r.compacts
+    out.push(
+      `- **Compactions:** ${k.count}${k.manual || k.auto ? ` (${[k.manual ? `${k.manual} manual` : '', k.auto ? `${k.auto} auto` : ''].filter(Boolean).join(', ')})` : ''}`,
+    )
+  }
+  if (r.errors.length) {
+    out.push(`- **Errors:** ${r.errors.length}`)
+    for (const f of r.errors.slice(0, 10)) {
+      out.push(`  - ${f.node.kind === 'prompt' ? 'the prompt' : call(f.node)} — ${cell(f.why)}`)
+    }
+    if (r.errors.length > 10) out.push(`  - …and ${r.errors.length - 10} more`)
+  }
+
   if (r.kinds.length) {
     out.push('', '| Tool | Calls | Avg | Total | Tokens (est.) |', '| --- | ---: | ---: | ---: | ---: |')
     for (const k of r.kinds) {

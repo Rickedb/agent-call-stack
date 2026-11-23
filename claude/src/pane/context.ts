@@ -13,6 +13,8 @@ export type Pane = {
   /** The row whose details show; '' for none. */
   pick: string
   isWaterfall: boolean
+  /** The view that draws what each prompt touched, instead of its rows. */
+  isFiles: boolean
   /** The ids of the rows whose children are folded away. */
   fold: Set<string>
   /** The prompts whose summary is collapsed. */

@@ -27,6 +27,7 @@ export const makeCtx = (s: Session, v: View): Ctx => {
     below,
     promptNo: new Map(prompts.map((n, i) => [n.id, i + 1])),
     isWaterfall: v.mode === 'waterfall',
+    isFiles: v.mode === 'files',
   }
 }
 
@@ -46,5 +47,5 @@ export const timesOf = (c: Ctx, top: Node): { t0: number; t1: number } => {
 
 export const slowestOf = (c: Ctx, top: Node): Node | undefined =>
   [top, ...c.below(top)]
-    .filter(n => n.kind !== 'prompt' && n.status !== 'run')
+    .filter(n => n.kind !== 'prompt' && n.kind !== 'event' && n.status !== 'run')
     .sort((a, b) => span(b, c.v.now) - span(a, c.v.now))[0]

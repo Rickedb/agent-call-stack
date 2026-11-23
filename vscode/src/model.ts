@@ -65,7 +65,11 @@ export class Session {
       case 'stop':
         return this.stop(ev)
       case 'session_end':
-        return this.finishRoot(ev.t, 'ok')
+        return this.sessionEnd(ev)
+      case 'error':
+        return this.error(ev)
+      case 'compact':
+        return this.compact(ev)
       case 'tool_pre':
         return this.toolPre(ev)
       case 'tool_post':
@@ -124,11 +128,13 @@ export class Session {
 
   private stop(ev: Ev): void {
     this.finishRoot(ev.t, 'ok', texts(ev, 'output'))
+    const top = this.byId.get(this.root)
+    if (top && ev.transcript) top.transcript = ev.transcript
   }
 
   // Ends the prompt and what is still under it: a call that never got a result
   // (one that was denied, say) is drawn as failed; a subagent as done.
-  private finishRoot(t: number, status: Node['status'], out: Texts = {}): void {
+  private finishRoot(t: number, status: Node['status'], out: Texts = {}, why?: string): void {
     const top = this.byId.get(this.root)
     if (!top || top.status !== 'run') return
     const below = new Set([top.id])
@@ -140,8 +146,52 @@ export class Session {
       if (n.kind === 'tool' && !n.output) n.output = '(no result recorded)'
     }
     Object.assign(top, out)
+    if (why) top.why = why
     this.open.clear()
     this.pending = []
+  }
+
+  // A session that ends while a prompt runs ends the prompt: well if it completed or the person left,
+  // badly if it was aborted, timed out or failed.
+  private sessionEnd(ev: Ev): void {
+    const bad: Record<string, string> = { abort: 'interrupted', error: 'session error', timeout: 'timed out' }
+    const why = ev.reason ? bad[ev.reason] : undefined
+    this.finishRoot(ev.t, why ? 'err' : 'ok', {}, why)
+  }
+
+  // An error the host reported: a row under what was running, with the message in its words and the
+  // rest (context, whether it was recoverable, the stack) in its text.
+  private error(ev: Ev): void {
+    this.ensureRoot(ev.t)
+    this.add({
+      parent: this.parentFor(ev) || undefined,
+      kind: 'event',
+      name: 'Error',
+      arg: ev.arg ?? '',
+      status: 'err',
+      start: ev.t,
+      end: ev.t,
+      why: ev.arg || 'error',
+      ...texts(ev, 'output'),
+    })
+  }
+
+  // The context was compacted. The hook fires before it and nothing after, so the row has no length,
+  // no size and no summary: only what set it off and what it was told to keep.
+  private compact(ev: Ev): void {
+    this.ensureRoot(ev.t)
+    this.add({
+      parent: this.parentFor(ev) || undefined,
+      kind: 'event',
+      name: 'Compact',
+      arg: ev.arg ?? '',
+      status: 'ok',
+      start: ev.t,
+      end: ev.t,
+      compact: { trigger: ev.reason ?? '' },
+      ...(ev.transcript ? { transcript: ev.transcript } : {}),
+      ...texts(ev, 'input'),
+    })
   }
 
   private key(ev: Ev): string {
@@ -203,6 +253,7 @@ export class Session {
       arg: ev.arg ?? '',
       status: 'run',
       start: ev.t,
+      ...(ev.touch ? { touch: ev.touch } : {}),
       ...texts(ev, 'input'),
     })
     this.queue(this.key(ev)).push(node.id)
@@ -237,6 +288,7 @@ export class Session {
     if (existing) {
       // Its first call came before its start: name it now.
       existing.name = name
+      if (ev.transcript) existing.transcript = ev.transcript
       existing.arg = spawn?.arg ?? existing.arg
       Object.assign(existing, spawn?.input)
       return
@@ -253,6 +305,7 @@ export class Session {
       arg: spawn?.arg ?? '',
       status: 'run',
       start: ev.t,
+      ...(ev.transcript ? { transcript: ev.transcript } : {}),
       ...spawn?.input,
     })
     if (ev.agentId) this.agents.set(ev.agentId, node.id)
@@ -288,6 +341,7 @@ export class Session {
     }
     node.status = 'ok'
     node.end = ev.t
+    if (ev.transcript) node.transcript = ev.transcript
     Object.assign(node, texts(ev, 'output'))
   }
 }

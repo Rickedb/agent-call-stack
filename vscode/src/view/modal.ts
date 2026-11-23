@@ -29,7 +29,14 @@ export const modal = (c: Ctx, n: Node): string => {
         ${n.arg ? `<div class="modal-arg">${esc(n.arg)}</div>` : ''}
         <div class="dim">started +${dur(n.start - t0)} · took ${dur(took)} · ${Math.min(100, Math.round((took / t1) * 100))}% of prompt</div>
         <div class="dim">input ${tokText(n, 'input')} · output ${tokText(n, 'output')}</div>
-        ${model ? `<div class="dim">${n.model ? 'model' : 'called by'} ${esc(modelName(model))}</div>` : ''}
+        ${model && n.kind !== 'event' ? `<div class="dim">${n.model ? 'model' : 'called by'} ${esc(modelName(model))}</div>` : ''}
+        ${n.why && n.kind !== 'event' ? `<div class="tint-err">why: ${esc(n.why)}</div>` : ''}
+        ${n.compact ? `<div class="dim">${esc(n.compact.trigger || 'compaction')} · the host reports no size, length or summary for it</div>` : ''}
+        ${
+          n.transcript
+            ? `<div class="dim transcript"><span title="${esc(n.transcript)}">transcript ${esc(n.transcript)}</span> ${button('copyTranscript', 'Copy transcript path', `data-id="${esc(n.id)}"`, 'plain')}</div>`
+            : ''
+        }
         ${block(c, n, 'input')}
         ${block(c, n, 'output')}
       </div>
