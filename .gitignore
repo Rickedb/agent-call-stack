@@ -1,2 +1,8 @@
 .claude-plugin/types/
 node_modules/
+*.tsbuildinfo
+*.log
+.env
+.env.*
+.DS_Store
+.claude/settings.local.json
