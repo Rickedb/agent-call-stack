@@ -1,0 +1,49 @@
+import type { EngineInterface } from 'claude-code'
+
+import type { Node } from '../../types'
+import { dur, tokText } from '../format'
+import { clearSelected } from '../state'
+import { block } from './block'
+import type { Pane } from './context'
+import { icon, mark, tint } from './theme'
+
+// What opens under a row: its state, timing, sizes, and its input and output.
+export function details($: EngineInterface, c: Pane, n: Node, t0: number, t1: number) {
+  const { Box, Text, Button } = c.els
+  return (
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={tint(n)}
+      paddingX={1}
+      marginLeft={c.gutter}
+      marginY={1}
+      gap={1}
+    >
+      <Box flexDirection="column">
+        <Text>
+          <Text color={tint(n)} bold>
+            {icon(n)} {mark(n)} {n.status === 'run' ? 'Running' : n.status === 'ok' ? 'Done' : 'Failed'}
+          </Text>
+          <Text dimColor> · {n.kind}</Text>
+        </Text>
+        {n.hist ? (
+          <Text dimColor>
+            From earlier in the chat{n.ms !== undefined ? ` · took ${dur(n.ms)}` : ' · timing was not recorded'}
+          </Text>
+        ) : (
+          <Text dimColor>
+            started +{dur(n.start - t0)} · took {dur(c.span(n))} ·{' '}
+            {Math.min(100, Math.round((c.span(n) / t1) * 100))}% of prompt
+          </Text>
+        )}
+        <Text dimColor>{`input ${tokText(n, 'input')} · output ${tokText(n, 'output')}`}</Text>
+      </Box>
+      {block($, c, n, 'input')}
+      {block($, c, n, 'output')}
+      <Button key="close" role="dismiss" onPress={() => void clearSelected($)}>
+        Close
+      </Button>
+    </Box>
+  )
+}

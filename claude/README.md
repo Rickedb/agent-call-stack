@@ -22,12 +22,37 @@ Each row shows the size of its output in tokens (`~340 tok`), and a row's detail
 
 The pane opens at session start. Run `/call-tree` to open it again.
 
+## Layout
+
+```
+hooks/hooks.json      names the one hooks module
+hooks/register.tsx    wires the three parts below
+src/lifecycle.tsx     opening the pane, /call-tree, the button that reopens it
+src/recording.ts      turns, subagents and tool calls into rows
+src/pane/             drawing the rows: index (reads state, picks the view),
+                      toolbar, section, row, bar, details, block, widget, theme
+src/state.ts          every atom, and every read and write of the state
+src/history.ts        reads the chat's earlier messages into rows
+src/nodes.ts          row bookkeeping: upsert, patch, keep (cut text to a file), guard
+src/format.ts         text helpers: clip, describe, durations, token estimates
+src/config.ts         limits and names
+types/index.d.ts      the row type and the state the mod declares
+```
+
+The engine reads a hooks module by scanning its source, which sets two rules for splitting it:
+
+- `$` may be passed to another file only into a `function` declaration, never an arrow function in a `const`, and never stored in an object. So helpers that take `$` are declared with `function`, and the pane parts take `$` as their first argument next to the context they draw from.
+- The state scan wants each atom beside the `update` that writes it, so `src/state.ts` holds all the atoms and the rest of the mod calls its functions (`setMode($, ...)`, `toggleFolded($, id)`) instead of `read` and `update`.
+
+`claude plugin validate .` reports a break of either rule, naming the file and line.
+
 ## Develop
 
 Validate and type-check:
 
 ```bash
-claude plugin validate .
+claude plugin validate .   # checks the manifest and reads the hooks module as the engine will
+claude plugin test .       # runs ai-call-tree.test.tsx
 ```
 
 Run it from this folder (`claude/`). Load it in a session with `claude --plugin-dir <this folder>`.
