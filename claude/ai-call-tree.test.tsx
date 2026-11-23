@@ -1,5 +1,7 @@
 import { expect, test } from 'claude-code/testing'
 
+import { reportOf } from './src/stats'
+
 const PANE = {
   plugin: 'ai-call-tree',
   component: 'Pane',
@@ -237,7 +239,7 @@ const injected = (): Record<string, [string, unknown]> => {
   }
 }
 
-test('calls at the same time, and the nesting, are clear in the tree', async ($, on) => {
+test('the nesting is clear in the tree, and nothing is marked as parallel', async ($, on) => {
   const held = injected()
   on('state.get', (_, e) => {
     const one = held[String(e.key)]
@@ -248,11 +250,10 @@ test('calls at the same time, and the nesting, are clear in the tree', async ($,
     held.mode = ['mode-2', mode]
     const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
 
-    // Grep and Read overlap: each says so; Bash ran after them and does not.
-    expect((await ui.findAll({ type: 'Text', text: /∥ ×2/ })).length).toBe(2)
-    // They are drawn with the double connector, the others with the plain one.
-    expect((await ui.findAll({ type: 'Text', text: /^╞═$/ })).length).toBe(2)
-    expect((await ui.findAll({ type: 'Text', text: /^├─$/ })).length).toBe(1) // Before
+    // Overlapping calls (Grep and Read) say nothing of it: timing alone cannot tell parallel from coincidence.
+    expect((await ui.findAll({ type: 'Text', text: /∥|╞|╘|║/ })).length).toBe(0)
+    // Every branch has the plain connector; the last of its level an elbow.
+    expect((await ui.findAll({ type: 'Text', text: /^├─$/ })).length).toBe(3) // Before, Grep, Read
     expect((await ui.findAll({ type: 'Text', text: /^└─$/ })).length).toBe(2) // Explore, Bash
 
     // One line a call, in the waterfall too: the bar is on the row, not under it, so
@@ -264,12 +265,6 @@ test('calls at the same time, and the nesting, are clear in the tree', async ($,
 
     await ui.unmount()
   }
-
-  // The details of one name the other (the row picked, as a press would leave it).
-  held.selected = ['selected-1', 'g1']
-  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect(await ui.find({ type: 'Text', text: /ran at the same time as 1 other: Read/ })).toBeDefined()
-  await ui.unmount()
 })
 
 test('a narrow pane keeps the bar, and gives up the start text and the slowest label', async ($, on) => {
@@ -333,4 +328,61 @@ test('an empty session says so', async ($, on) => {
 
   expect((await ui.find({ type: 'Text' }))?.text).toBe('No calls yet')
   await ui.unmount()
+})
+
+test('a finished prompt ends with its summary, a running one has none', async ($, on) => {
+  const held = injected()
+  const nodes = (held.nodes as [string, any[]])[1]
+  // Sizes in characters: a read of 4000 characters is about a thousand tokens.
+  Object.assign(nodes.find(n => n.id === 'g1'), { input: 'x'.repeat(40), inputLen: 40, outputLen: 4000 })
+  Object.assign(nodes.find(n => n.id === 'g3'), { status: 'err' })
+  on('state.get', (_, e) => {
+    const one = held[String(e.key)]
+    return one ? { value: { value: { shape: one[0], value: one[1] }, version: 1 } } : { value: null }
+  })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /Summary/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /4 tool calls · 1 failed/ })).toBeDefined()
+  // The calls by tool (the subagent is counted apart): Before, Grep, Read and Bash once each.
+  for (const name of ['Before', 'Grep', 'Read', 'Bash']) {
+    expect(await ui.find({ type: 'Text', text: new RegExp(`^${name}\\s+1 `) })).toBeDefined()
+  }
+  expect(await ui.find({ type: 'Text', text: /Heaviest\s+Grep\s+~1\.0k tok/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /in ~10 tok · out ~1\.0k tok · total ~1\.0k tok \(estimated\)/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /1 subagent · longest Explore 1\.8s/ })).toBeDefined()
+  await ui.unmount()
+
+  // While the prompt runs there is none.
+  Object.assign(nodes.find(n => n.id === 'p1'), { status: 'run', end: undefined })
+  const ui2 = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui2.find({ type: 'Text', text: /Summary/ })).toBeUndefined()
+  await ui2.unmount()
+})
+
+test('the summary counts calls by tool, tokens, time in calls, and skips history', () => {
+  const n = (id: string, kind: 'tool' | 'agent', name: string, start: number, end: number, over = {}) =>
+    ({ id, parent: 'p', kind, name, arg: '', status: 'ok' as const, start, end, ...over })
+  const top = { id: 'p', kind: 'prompt' as const, name: 'Prompt', arg: '', status: 'ok' as const, start: 0, end: 10_000, inputLen: 40, outputLen: 80 }
+  const below = [
+    n('a', 'tool', 'Read', 0, 1000, { inputLen: 20, outputLen: 400 }),
+    n('b', 'tool', 'Read', 500, 3000, { inputLen: 20, outputLen: 1200 }),
+    n('c', 'tool', 'Bash', 5000, 6000, { status: 'err' as const }),
+    n('d', 'agent', 'Explore', 6000, 9000),
+  ]
+  const r = reportOf(top, below, 20_000)!
+  expect(r.calls).toBe(3)
+  expect(r.failed).toBe(1)
+  expect(r.kinds.map(k => [k.name, k.count])).toEqual([['Read', 2], ['Bash', 1]])
+  expect(r.avg).toBe((1000 + 2500 + 1000) / 3)
+  expect(r.slowest?.id).toBe('b')
+  expect(r.heaviest?.id).toBe('b')
+  expect(r.input).toBe(10 + 5 + 5)
+  expect(r.output).toBe(20 + 100 + 300)
+  // 0-3000 (the two reads overlap), 5000-6000, and the subagent's 6000-9000.
+  expect(r.busy).toBe(3000 + 1000 + 3000)
+  expect(r.agents.count).toBe(1)
+  expect(reportOf({ ...top, status: 'run' as const }, below, 20_000)).toBeUndefined()
+  expect(reportOf({ ...top, hist: true as const }, below, 20_000)).toBeUndefined()
+  expect(reportOf(top, [], 20_000)).toBeUndefined()
 })

@@ -42,7 +42,7 @@ export const dur = (ms: number) => {
 export const sizeOf = (n: Node, which: 'input' | 'output') =>
   (which === 'input' ? n.inputLen ?? n.input?.length : n.outputLen ?? n.output?.length) ?? 0
 
-const fmtTokens = (n: number) =>
+export const fmtTokens = (n: number) =>
   n < 1000
     ? `${n}`
     : n < 10_000
@@ -50,6 +50,9 @@ const fmtTokens = (n: number) =>
       : n < 1_000_000
         ? `${Math.round(n / 1000)}k`
         : `${(n / 1_000_000).toFixed(1)}M`
+
+/** `~340 tok` for a count of estimated tokens. */
+export const tokCount = (tokens: number) => `~${fmtTokens(tokens)} tok`
 
 /** `~340 tok`, or `—` for a text there is none of (yet). */
 export const tokText = (n: Node, which: 'input' | 'output') => {

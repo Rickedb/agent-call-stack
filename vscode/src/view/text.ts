@@ -1,8 +1,8 @@
 import type { Session } from '../model'
-import { parallelGroups } from '../parallel'
+import { reportOf } from '../stats'
 import type { Node } from '../types'
 import { index } from './context'
-import { clip, dur, icon, mark, sizeOf, span, tokText } from './format'
+import { clip, dur, icon, mark, sizeOf, span, tokCount, tokText } from './format'
 
 /**
  * The tree as plain text, for a chat reply (`@calltree`): the stack of what runs
@@ -31,19 +31,28 @@ export const renderText = (s: Session | undefined, now: number): string => {
   }
 
   out.push(`${line(top)}   ${dur(span(top, now))}${size(top)}`)
-  // A branch that ran at the same time as its siblings is drawn double: ╞═ ╘═ ║.
   const walk = (n: Node, prefix: string) => {
     const children = kids.get(n.id) ?? []
-    const together = parallelGroups(children, now)
     children.forEach((c, i) => {
       const last = i === children.length - 1
-      const group = together.get(c.id)
-      const connector = group ? (last ? '╘═' : '╞═') : last ? '└─' : '├─'
-      const tag = group ? `  ∥ ×${group.members.length}` : ''
-      out.push(`${prefix}${connector} ${line(c)}   ${dur(span(c, now))}${size(c)}${tag}`)
-      walk(c, prefix + (last ? '   ' : group ? '║  ' : '│  '))
+      out.push(`${prefix}${last ? '└─' : '├─'} ${line(c)}   ${dur(span(c, now))}${size(c)}`)
+      walk(c, prefix + (last ? '   ' : '│  '))
     })
   }
   walk(top, '')
+
+  // A prompt that has finished ends with its summary.
+  const r = reportOf(top, below(top), now)
+  if (r) {
+    const took = (n: Node) => dur((n.end ?? now) - n.start)
+    const named = (n: Node) => `${n.name}${n.arg ? ` ${clip(n.arg, 40)}` : ''}`
+    out.push('', `Summary: ${r.calls} tool calls${r.failed ? `, ${r.failed} failed` : ''}, took ${dur(r.wall)}`)
+    for (const k of r.kinds.slice(0, 8)) {
+      out.push(`  ${k.name}  ${k.count}x${k.done ? `  avg ${dur(k.avg)}  total ${dur(k.ms)}` : ''}${k.failed ? `  ${k.failed} failed` : ''}`)
+    }
+    if (r.slowest) out.push(`  average ${dur(r.avg)} a tool call, slowest ${named(r.slowest)} ${took(r.slowest)}`)
+    if (r.heaviest) out.push(`  heaviest ${named(r.heaviest)} ${tokCount(r.heavy)}`)
+    out.push(`  tokens (estimated): in ${tokCount(r.input)}, out ${tokCount(r.output)}, total ${tokCount(r.input + r.output)}`)
+  }
   return out.join('\n')
 }

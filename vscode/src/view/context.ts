@@ -1,5 +1,4 @@
 import type { Session } from '../model'
-import { parallelGroups, type Group } from '../parallel'
 import type { Node } from '../types'
 import { span } from './format'
 import type { Ctx, View } from './types'
@@ -18,8 +17,6 @@ export const index = (list: Node[]) => {
 export const makeCtx = (s: Session, v: View): Ctx => {
   const list = s.nodes
   const { kids, below } = index(list)
-  const together = new Map<string, Group>()
-  for (const sibs of kids.values()) for (const [id, g] of parallelGroups(sibs, v.now)) together.set(id, g)
   const prompts = list.filter(n => n.kind === 'prompt')
   return {
     v,
@@ -28,7 +25,6 @@ export const makeCtx = (s: Session, v: View): Ctx => {
     byId: new Map(list.map(n => [n.id, n])),
     kids,
     below,
-    together,
     promptNo: new Map(prompts.map((n, i) => [n.id, i + 1])),
     isWaterfall: v.mode === 'waterfall',
   }

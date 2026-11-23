@@ -9,10 +9,15 @@ import type { Ctx, View } from './types'
 export const empty = (v: View): string => {
   const setting = button('openSettings', 'Open the hooks setting', '', 'plain')
   if (v.hooksInstalled) {
+    // The settings button only when the setting is what is wrong.
+    const off = v.hooksOff
+      ? `<p class="warn">Agent hooks are turned off in VS Code, so nothing is recorded. ${setting}</p>`
+      : ''
     return `<div class="empty">
         <b>No calls yet</b>
         <p>Send a prompt to Copilot in agent mode and what it does shows up here, as a tree.</p>
-        <p class="dim">Nothing showing up? Start a new agent chat, check that <code>node</code> is on your PATH and that agent hooks are enabled in VS Code. ${setting}</p>
+        ${off}
+        <p class="dim">Nothing showing up? Start a new agent chat and check that <code>node</code> is on your PATH.</p>
       </div>`
   }
   return `<div class="empty">
@@ -27,25 +32,28 @@ export const empty = (v: View): string => {
 }
 
 // The buttons above the rows: Tree or Waterfall, the session drop-down, and fold all.
-export const toolbar = (c: Ctx): string => {
-  const { v, list, kids } = c
-  const foldable = list.filter(n => (kids.get(n.id) ?? []).length > 0).map(n => n.id)
-  const isAllFolded = foldable.length > 0 && foldable.every(id => v.folded.has(id))
-  const picker =
-    v.sessions.length > 1
-      ? `<select data-act="pick" title="Chat session">
+// The drop-down of chat sessions, when there is more than one. It is drawn even when
+// the session picked has nothing to show, so that another can always be picked.
+export const picker = (v: View): string =>
+  v.sessions.length > 1
+    ? `<select data-act="pick" title="Chat session">
           <option value=""${v.picked === '' ? ' selected' : ''}>Latest session</option>
           ${v.sessions
             .map(x => `<option value="${esc(x.id)}"${x.id === v.picked ? ' selected' : ''}>${esc(clip(x.label, 50))}</option>`)
             .join('')}
         </select>`
-      : ''
+    : ''
+
+export const toolbar = (c: Ctx): string => {
+  const { v, list, kids } = c
+  const foldable = list.filter(n => (kids.get(n.id) ?? []).length > 0).map(n => n.id)
+  const isAllFolded = foldable.length > 0 && foldable.every(id => v.folded.has(id))
   return `<div class="bar">
       <div class="seg">
         ${button('mode', 'Tree', 'data-v="tree"', c.isWaterfall ? '' : 'primary')}
         ${button('mode', 'Waterfall', 'data-v="waterfall"', c.isWaterfall ? 'primary' : '')}
       </div>
-      ${picker}
+      ${picker(v)}
       ${foldable.length ? button('foldAll', isAllFolded ? 'unfold all' : 'fold all', '', 'plain') : ''}
     </div>`
 }

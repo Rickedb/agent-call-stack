@@ -17,11 +17,21 @@ Stack (innermost first)
 ## Reading the tree
 
 - **Nesting.** A subagent is a row, and the calls it makes are its children. Guide lines (`├─ └─`) draw the branches. Neither Copilot's hooks nor the engine say which tool call started another, so a tool that calls other tools shows as siblings, not as parent and child; only subagents nest.
-- **At the same time.** Calls under one parent whose spans overlap are one parallel group (a call still running lasts until now; calls that touch end to start are in sequence). Each is marked `∥ ×N` and drawn with its own double connector (`╞═ ╘═ ║`) in a different color, and a row's details name who it ran with. In the waterfall, the overlapping bars show it too.
+- **Parallel calls are not marked.** Neither the engine nor Copilot's hooks say which calls were started together, and overlap in time alone cannot tell parallel from coincidence, so the tree does not guess. In the waterfall, overlapping bars still show what ran at the same moment.
 
 ## Tokens
 
 Each row shows the size of its output in tokens (`~340 tok`), and a row's details show both the input and the output. These are estimates, at four characters a token, from the whole text. The engine gives no count per call, so every row is estimated alike. The [Copilot port](../vscode/README.md) does the same.
+
+## Summary of a finished prompt
+
+When a prompt has finished and made at least one call, a summary ends its rows (not while it runs, when it is folded, or for a prompt read back from history):
+
+- **Calls**: the tool calls, how many failed, how long the prompt took, and how much of that some call was running (overlaps count once).
+- **By tool**: one line per tool, the most called first, with its calls, average time, total time and tokens, and its failures.
+- **Average**, **slowest** and **heaviest** call (the one that moved the most text, in plus out).
+- **Tokens**: in (the prompt and every call's input), out (the answer and every call's output) and the total. Estimates, as above: the engine gives no count per call.
+- **Subagents**: how many, how many failed, and the longest. They are not counted as tool calls, and their time overlaps their own calls.
 
 ## Use
 
@@ -40,7 +50,8 @@ src/lifecycle.tsx     opening the pane, /call-tree, the button that reopens it
 src/recording.ts      turns, subagents and tool calls into rows
 src/pane/             drawing the rows: index (reads state, picks the view),
                       toolbar, section, row, bar, details, block, widget, theme,
-                      cells (the right-hand columns), parallel (calls at the same time)
+                      cells (the right-hand columns), report (the summary)
+src/stats.ts          the summary's numbers, from a prompt's rows
 src/state.ts          every atom, and every read and write of the state
 src/history.ts        reads the chat's earlier messages into rows
 src/nodes.ts          row bookkeeping: upsert, patch, keep (cut text to a file), guard

@@ -1,7 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { Node } from '../../types'
-import type { Group } from './parallel'
 
 /** The element table of the surface being drawn: `Box`, `Text`, `Button`. */
 export type Els = ReturnType<EngineInterface['ui']['resolve']>
@@ -25,8 +24,6 @@ export type Pane = {
   below: (n: Node) => Node[]
   /** How long a node ran: what history recorded, else start to end (or now). */
   span: (n: Node) => number
-  /** Calls that ran at the same time as others under their parent, by id. */
-  together: Map<string, Group>
   /** The room left of a row's details. */
   gutter: number
   /** The width of the bar column at a row's right end; 0 in the tree. */
@@ -34,8 +31,8 @@ export type Pane = {
   promptNo: Map<string, number>
 }
 
-/** One level above a row: does its branch go on below, and was it a parallel one. */
-export type Lane = { last: boolean; par: boolean }
+/** One level above a row: does its branch go on below. */
+export type Lane = { last: boolean }
 
 /** A row's place in the tree. */
 export type Place = {

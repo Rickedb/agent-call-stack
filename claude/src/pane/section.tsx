@@ -4,6 +4,7 @@ import type { Node } from '../../types'
 import { dur } from '../format'
 import { cellsOf } from './cells'
 import type { Lane, Pane, Place, Section } from './context'
+import { report } from './report'
 import { row } from './row'
 
 // One prompt: its own time axis and its rows, honoring folds.
@@ -17,14 +18,14 @@ export function section($: EngineInterface, c: Pane, top: Node) {
     .sort((a, b) => c.span(b) - c.span(a))[0]
 
   // Each row with its place in the tree: for each level above it, whether that
-  // branch goes on below (a guide line) and whether it was a parallel one.
+  // branch goes on below (a guide line).
   const rows: Place[] = []
   const walk = (n: Node, depth: number, trail: Lane[], isLast: boolean) => {
     const isFolded = c.fold.has(n.id)
     rows.push({ node: n, depth, hidden: isFolded ? c.below(n).length : 0, trail, isLast })
     if (isFolded) return
     const sibs = c.kids.get(n.id) ?? []
-    const next = depth === 0 ? [] : [...trail, { last: isLast, par: c.together.has(n.id) }]
+    const next = depth === 0 ? [] : [...trail, { last: isLast }]
     sibs.forEach((k, i) => walk(k, depth + 1, next, i === sibs.length - 1))
   }
   walk(top, 0, [], true)
@@ -56,6 +57,7 @@ export function section($: EngineInterface, c: Pane, top: Node) {
         </Box>
       ) : null}
       {rows.map(r => row($, c, s, r))}
+      {c.fold.has(top.id) ? null : report(c, top)}
     </Box>
   )
 }

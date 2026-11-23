@@ -19,6 +19,7 @@ const view = (over: Partial<View> = {}): View => ({
   shown: new Set(),
   now: t + 500,
   hooksInstalled: true,
+  hooksOff: false,
   hasWorkspace: true,
   sessions: [],
   picked: '',
@@ -53,7 +54,26 @@ test('once installed, an empty session says what to do and offers no install', (
   assert.match(html, /No calls yet/)
   assert.match(html, /Send a prompt to Copilot in agent mode/)
   assert.doesNotMatch(html, /data-act="install/)
+  // Hooks are set up and on: no button to a setting that is not the problem.
+  assert.doesNotMatch(html, /data-act="openSettings"/)
+})
+
+test('the settings button shows only when VS Code has agent hooks turned off', () => {
+  const html = renderBody(undefined, view({ hooksOff: true }))
+  assert.match(html, /Agent hooks are turned off in VS Code/)
   assert.match(html, /data-act="openSettings"/)
+})
+
+test('a session with no prompt keeps the drop-down, so another can be picked', () => {
+  const sessions = [
+    { id: 'a', label: '(no prompt yet)' },
+    { id: 'b', label: 'work' },
+  ]
+  const html = renderBody(new Session('a'), view({ sessions, picked: 'a' }))
+  assert.match(html, /No calls yet/)
+  assert.match(html, /<select data-act="pick"/)
+  assert.match(html, /<option value="a" selected>/)
+  assert.doesNotMatch(renderBody(new Session('a'), view()), /<select/)
 })
 
 test('the waterfall lists each call with its start; the tree has no start offsets', () => {
@@ -228,48 +248,56 @@ const nested = () =>
     ev({ kind: 'agent_stop', agentId: 'ag', agentType: 'Explore' }),
   )
 
-test('calls at the same time are marked, in the tree and in the waterfall', () => {
-  for (const mode of ['tree', 'waterfall'] as const) {
-    const html = renderBody(nested(), view({ mode }))
-    // Grep and Read overlap: each says so, and its branch is drawn in the parallel color.
-    assert.equal(html.match(/class="par-tag"/g)?.length, 2)
-    assert.match(html, /parallel ×2/)
-    assert.equal(html.match(/class="lane [lt] par"/g)?.length, 2)
-  }
-})
-
-test('a call that ran alone has no parallel mark', () => {
-  const s = session(
-    ev({ kind: 'prompt', arg: 'p' }),
-    ev({ kind: 'tool_pre', tool: 'A', toolUseId: 'a' }),
-    ev({ kind: 'tool_post', tool: 'A', toolUseId: 'a', output: 'x' }),
-    ev({ kind: 'tool_pre', tool: 'B', toolUseId: 'b' }),
-    ev({ kind: 'tool_post', tool: 'B', toolUseId: 'b', output: 'x' }),
-  )
-  const html = renderBody(s, view())
-  assert.doesNotMatch(html, /par-tag/)
-  assert.doesNotMatch(html, /lane [lt] par/)
-})
-
 test('guide lines show the nesting: a line goes on past a branch that has more after it', () => {
   const html = renderBody(nested(), view({ mode: 'tree' }))
   // Before (not last, at depth 1) gets a tee; Explore (last) an elbow; and the calls
   // inside Explore see no line from Explore, as it is the last of its level.
   assert.match(html, /class="lane t"/)
   assert.match(html, /class="lane l"/)
-  const s = nested()
-  const before = s.nodes.find(n => n.name === 'Before')
-  // The details name who a call ran with.
-  const grep = s.nodes.find(n => n.name === 'Grep')
-  const open = renderBody(s, view({ selected: grep?.id ?? '' }))
-  assert.match(open, /class="par-text">Ran at the same time as 1 other: Read two/)
-  assert.doesNotMatch(renderBody(s, view({ selected: before?.id ?? '' })), /class="par-text"/)
 })
 
-test('the text tree draws a parallel branch double', () => {
+test('the text tree draws plain connectors, and marks nothing as parallel', () => {
   const text = renderText(nested(), t + 1000)
-  assert.match(text, /╞═ .*Grep.*∥ ×2/)
-  assert.match(text, /╘═ .*Read.*∥ ×2/)
   assert.match(text, /├─ .*Before/)
   assert.match(text, /└─ .*Explore/)
+  assert.doesNotMatch(text, /∥|╞|╘|║/)
+})
+
+const finished = () =>
+  session(
+    ev({ kind: 'prompt', arg: 'work', input: 'work' }),
+    ev({ kind: 'tool_pre', tool: 'Read', arg: 'a.ts', toolUseId: 'r1', input: 'x'.repeat(40) }),
+    ev({ kind: 'tool_post', tool: 'Read', toolUseId: 'r1', output: 'y'.repeat(4000) }),
+    ev({ kind: 'tool_pre', tool: 'Read', arg: 'b.ts', toolUseId: 'r2' }),
+    ev({ kind: 'tool_post', tool: 'Read', toolUseId: 'r2', output: 'ok' }),
+    ev({ kind: 'tool_pre', tool: 'Bash', arg: 'ls', toolUseId: 'b1' }),
+    ev({ kind: 'tool_post', tool: 'Bash', toolUseId: 'b1', output: 'z' }),
+    ev({ kind: 'stop', output: 'done' }),
+  )
+
+test('a finished prompt ends with its summary; a running one has none', () => {
+  const html = renderBody(finished(), view())
+  assert.match(html, /class="report /)
+  assert.match(html, /3 tool calls/)
+  // By tool: Read twice, Bash once.
+  assert.match(html, /<td class="name">Read<\/td>\s*<td>2<\/td>/)
+  assert.match(html, /<td class="name">Bash<\/td>\s*<td>1<\/td>/)
+  assert.match(html, /Slowest/)
+  assert.match(html, /Heaviest<\/span><span class="val"[^>]*>Read a\.ts ~1\.0k tok/)
+  assert.match(html, /in ~\d+ tok · out ~[\d.]+k tok · total ~[\d.]+k tok \(estimated\)/)
+  assert.doesNotMatch(renderBody(basic(), view()), /class="report /)
+})
+
+test('a folded prompt hides its summary', () => {
+  const s = finished()
+  const top = s.nodes.find(n => n.kind === 'prompt')
+  assert.doesNotMatch(renderBody(s, view({ folded: new Set([top?.id ?? '']) })), /class="report /)
+})
+
+test('the text tree ends with the summary of a finished prompt', () => {
+  const text = renderText(finished(), t + 500)
+  assert.match(text, /Summary: 3 tool calls/)
+  assert.match(text, /Read {2}2x/)
+  assert.match(text, /tokens \(estimated\): in ~\d+ tok, out ~[\d.]+k tok, total/)
+  assert.doesNotMatch(renderText(basic(), t + 500), /Summary:/)
 })

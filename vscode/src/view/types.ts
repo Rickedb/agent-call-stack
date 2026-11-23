@@ -1,4 +1,3 @@
-import type { Group } from '../parallel'
 import type { Node } from '../types'
 
 /** What the panel is showing, as the extension host keeps it. */
@@ -12,6 +11,8 @@ export type View = {
   shown: Set<string>
   now: number
   hooksInstalled: boolean
+  /** True when VS Code's setting for agent hooks (chat.useHooks) is turned off. */
+  hooksOff: boolean
   /** Whether a folder is open, so that hooks can be installed for it alone. */
   hasWorkspace: boolean
   /** Every session of the workspace, newest first, and the one drawn. */
@@ -28,14 +29,12 @@ export type Ctx = {
   kids: Map<string, Node[]>
   /** Every row under a node, however deep. */
   below: (n: Node) => Node[]
-  /** Calls under one parent that ran at the same time, by id. */
-  together: Map<string, Group>
   promptNo: Map<string, number>
   isWaterfall: boolean
 }
 
-/** One level above a row: does its branch go on below, and was it a parallel one. */
-export type Lane = { last: boolean; par: boolean }
+/** One level above a row: does its branch go on below. */
+export type Lane = { last: boolean }
 
 /** A row's place in the tree. */
 export type Place = {

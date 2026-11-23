@@ -13,10 +13,10 @@ How data is shown depends on the agent's surface, so each agent keeps its presen
 
 | Agent | Presentation files | How a row's details show |
 | --- | --- | --- |
-| Claude Code | `claude/src/pane/` (`row`, `section`, `bar`, `details`, `block`, `toolbar`, `widget`, `theme`, ...) | inline, under the row |
-| GitHub Copilot in VS Code | `vscode/src/view/` (`rows`, `modal`, `blocks`, `toolbar`, `text`, `format`, `context`, ...), drawn by `vscode/media/` | in a modal over the view |
+| Claude Code | `claude/src/pane/` (`row`, `section`, `bar`, `details`, `block`, `report`, `toolbar`, `widget`, `theme`, ...) | inline, under the row |
+| GitHub Copilot in VS Code | `vscode/src/view/` (`rows`, `modal`, `blocks`, `report`, `toolbar`, `text`, `format`, `context`, ...), drawn by `vscode/media/` | in a modal over the view |
 
-What is recorded, grouped (parallel calls), folded and counted (tokens) is the same in both, and each agent keeps its own copy of that logic in its own language. A new way to show data goes in the presentation folder of the agent it is for, with a row in this table.
+What is recorded, folded, counted (tokens) and summed up (a finished prompt's summary, `stats.ts`) is the same in both, and each agent keeps its own copy of that logic in its own language. A new way to show data goes in the presentation folder of the agent it is for, with a row in this table.
 
 ## The rule
 

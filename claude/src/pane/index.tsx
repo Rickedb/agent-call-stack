@@ -4,7 +4,6 @@ import type { Node } from '../../types'
 import { PANE } from '../config'
 import { readFolded, readMode, readNodes, readSelected, readShown } from '../state'
 import type { Pane as Draw } from './context'
-import { parallelGroups } from './parallel'
 import { section } from './section'
 import { summary, toolbar } from './toolbar'
 import { widget } from './widget'
@@ -37,10 +36,6 @@ export const pane = (on: On) => {
       }
       const below = (n: Node): Node[] => (kids.get(n.id) ?? []).flatMap(c => [c, ...below(c)])
 
-      // Calls under one parent that ran at the same time.
-      const together: Draw['together'] = new Map()
-      for (const sibs of kids.values()) for (const [id, g] of parallelGroups(sibs, now)) together.set(id, g)
-
       const gutter = 2
       const isWaterfall = (await readMode($)) === 'waterfall'
       const c: Draw = {
@@ -55,7 +50,6 @@ export const pane = (on: On) => {
         now,
         kids,
         below,
-        together,
         span: n => (n.hist ? (n.ms ?? 0) : (n.end ?? now) - n.start),
         gutter,
         // The bar column: a quarter of the width, 8 to 32 cells. None in the tree. A narrow

@@ -6,31 +6,27 @@ import { bar } from './bar'
 import { cellsOf, WIDE } from './cells'
 import type { Pane, Place, Section } from './context'
 import { details } from './details'
-import { mark, PARALLEL, tint } from './theme'
+import { mark, tint } from './theme'
 
 // One row: the tree guides and fold arrow, a status glyph, name and argument,
-// then (to the right, in columns) a parallel mark, its output's size and its
-// time; the bar under it in the waterfall; its details when picked.
+// then (to the right, in columns) its output's size and its time; the bar under it in the waterfall; its details when picked.
 export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
   const { Box, Text, Button } = c.els
   const { node, depth, hidden, trail, isLast } = place
   const hasKids = (c.kids.get(node.id) ?? []).length > 0
-  const group = c.together.get(node.id)
   const isPicked = node.id === c.pick
   const { right, out } = cellsOf(c, node, s.t0)
 
   const lead = depth * 2 + 2
   const name = node.kind === 'prompt' ? `Prompt ${c.promptNo.get(node.id)}` : node.name
-  // A branch that ran at the same time as its siblings is drawn double.
-  const own = group ? (isLast ? '╘═' : '╞═') : isLast ? '└─' : '├─'
-  const tag = group ? `∥ ×${group.members.length}` : ''
+  const own = isLast ? '└─' : '├─'
   const isSlowest = node === s.slowest && s.rowCount > 3 && c.cols >= WIDE
 
   const tokCol = s.tokW ? s.tokW + 2 : 0
   // What the label has left once the right-hand cells and the bar column are taken.
   const barCol = c.barW ? c.barW + 1 : 0
   const room =
-    c.cols - lead - 2 - (tag ? tag.length + 1 : 0) - (isSlowest ? 8 : 0) - tokCol - (s.timeW + 1) - barCol - 1
+    c.cols - lead - 2 - (isSlowest ? 8 : 0) - tokCol - (s.timeW + 1) - barCol - 1
   const arg = clip(node.arg, room - name.length - 1)
 
   return (
@@ -39,17 +35,12 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
         <Box backgroundColor={isPicked ? 'subtle' : undefined}>
           <Box width={lead} flexShrink={0}>
             {trail.map(l => (
-              <Text
-                mono
-                wrap="truncate"
-                color={l.par && !l.last ? PARALLEL : undefined}
-                dimColor={!(l.par && !l.last)}
-              >
-                {l.last ? '  ' : l.par ? '║ ' : '│ '}
+              <Text mono wrap="truncate" dimColor>
+                {l.last ? '  ' : '│ '}
               </Text>
             ))}
             {depth > 0 ? (
-              <Text mono wrap="truncate" color={group ? PARALLEL : undefined} dimColor={!group}>
+              <Text mono wrap="truncate" dimColor>
                 {own}
               </Text>
             ) : null}
@@ -80,7 +71,6 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
               {hidden ? <Text dimColor> +{hidden}</Text> : null}
             </Button>
           </Box>
-          {tag ? <Text color={PARALLEL}>{`${tag} `}</Text> : null}
           {isSlowest ? <Text color="warning">slowest </Text> : null}
           {tokCol ? (
             <Box width={tokCol} justifyContent="flex-end">

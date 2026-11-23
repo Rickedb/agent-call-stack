@@ -38,11 +38,21 @@ Click a row to open its details in a modal over the view: its state, timing, tok
 ## Reading the tree
 
 - **Nesting.** A subagent is a row, and the calls it makes are its children. Guide lines (`├─ └─`) draw the branches. Neither Copilot's hooks nor the engine say which tool call started another, so a tool that calls other tools shows as siblings, not as parent and child; only subagents nest.
-- **At the same time.** Calls under one parent whose spans overlap are one parallel group (a call still running lasts until now; calls that touch end to start are in sequence). Each is marked `parallel ×N` and drawn with its own orange guide line, and a row's details name who it ran with. In the waterfall, the overlapping bars show it too.
+- **Parallel calls are not marked.** Copilot's hooks do not say which calls were started together, and overlap in time alone cannot tell parallel from coincidence, so the tree does not guess. In the waterfall, overlapping bars still show what ran at the same moment.
 
 ## Tokens
 
 Each row shows the size of its output in tokens (`~340 tok`, hover for what it means), and a row's details show both the input and the output. These are estimates, at four characters a token, from the whole text: Copilot's hooks give no token counts. The Claude Code mod shows the same figures, estimated the same way.
+
+## Summary of a finished prompt
+
+When a prompt has finished and made at least one call, a summary ends its rows (not while it runs, when it is folded, or for a prompt read back from history):
+
+- **Calls**: the tool calls, how many failed, how long the prompt took, and how much of that some call was running (overlaps count once).
+- **By tool**: one line per tool, the most called first, with its calls, average time, total time and tokens, and its failures.
+- **Average**, **slowest** and **heaviest** call (the one that moved the most text, in plus out).
+- **Tokens**: in (the prompt and every call's input), out (the answer and every call's output) and the total. Estimates, as above: Copilot's hooks give no token counts. `@calltree` ends with the same figures as text.
+- **Subagents**: how many, how many failed, and the longest. They are not counted as tool calls, and their time overlaps their own calls.
 
 ## Use
 
@@ -72,12 +82,13 @@ The panel's drawing is one file a concern in `src/view/`, with `src/render.ts` a
 
 ```
 src/view/index.ts     renderBody: toolbar, counts, a section per prompt (newest first), the modal
-src/view/rows.ts      a prompt's rows: guide lines, parallel marks, bars
+src/view/rows.ts      a prompt's rows: guide lines, bars
+src/view/report.ts    the summary of a finished prompt (numbers from src/stats.ts)
 src/view/modal.ts     a row's details in the modal
 src/view/blocks.ts    one input or output text, with Show all and Copy
 src/view/toolbar.ts   the buttons, the counts, the empty state
 src/view/text.ts      the tree as plain text, for @calltree
-src/view/context.ts   what one draw works out once (children, parallel groups, times)
+src/view/context.ts   what one draw works out once (children, times)
 src/view/format.ts    escaping, durations, token estimates, status marks
 src/view/types.ts     the view state the extension keeps, the draw context
 media/                the webview's script (Esc, focus, redraws) and stylesheet

@@ -19,6 +19,7 @@ const view = (over: Partial<View> = {}): View => ({
   shown: new Set(),
   now: t + 500,
   hooksInstalled: true,
+  hooksOff: false,
   hasWorkspace: true,
   sessions: [],
   picked: '',
@@ -87,18 +88,6 @@ test('a prompt opens in the modal too, with its whole text', () => {
   const html = renderBody(s, view({ selected: prompt?.id ?? '' }))
   assert.match(html, /aria-label="Prompt 2"/)
   assert.match(html, /<pre>second ask<\/pre>/)
-})
-
-test('a call that ran with others names them in the modal', () => {
-  const s = session(
-    ev({ kind: 'prompt', arg: 'p' }),
-    ev({ kind: 'tool_pre', tool: 'Grep', toolUseId: 'a', arg: 'one' }),
-    ev({ kind: 'tool_pre', tool: 'Read', toolUseId: 'b', arg: 'two' }),
-    ev({ kind: 'tool_post', tool: 'Grep', toolUseId: 'a', output: 'x' }),
-    ev({ kind: 'tool_post', tool: 'Read', toolUseId: 'b', output: 'x' }),
-  )
-  const html = renderBody(s, view({ selected: find(s, 'Grep') }))
-  assert.match(html, /class="par-text">Ran at the same time as 1 other: Read two/)
 })
 
 test('a selected id that is gone opens nothing; the picked row is highlighted', () => {

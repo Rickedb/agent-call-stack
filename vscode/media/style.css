@@ -75,17 +75,13 @@ hr { border: 0; border-top: 1px solid var(--vscode-panel-border); margin: 12px 0
 .actions { display: flex; gap: 12px; }
 .tok { flex: none; font-variant-numeric: tabular-nums; }
 
-/* Guide lines of the tree, over the whole item; a parallel branch is drawn thicker and in its own color. */
-:root { --c-par: var(--vscode-charts-orange, #d18616); --c-guide: var(--vscode-tree-indentGuidesStroke, rgba(128,128,128,.55)); }
+/* Guide lines of the tree, over the whole item. */
+:root { --c-guide: var(--vscode-tree-indentGuidesStroke, rgba(128,128,128,.55)); }
 .item { position: relative; }
 .lane { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid var(--c-guide); pointer-events: none; }
 .lane.l { bottom: auto; height: 11px; }
 .lane.t::after, .lane.l::after { content: ''; position: absolute; left: 0; top: 11px; width: 8px; border-top: 1px solid var(--c-guide); }
 .lane.l::after { top: 10px; }
-.lane.par { border-left: 2px solid var(--c-par); }
-.lane.par::after { border-top: 2px solid var(--c-par) !important; }
-.par-tag { flex: none; color: var(--c-par); font-variant-numeric: tabular-nums; }
-.par-text { color: var(--c-par); }
 
 /* The details of a row, in a modal over the panel. The body scrolls inside the dialog. */
 .overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 12px; }
@@ -96,3 +92,14 @@ hr { border: 0; border-top: 1px solid var(--vscode-panel-border); margin: 12px 0
 .modal-body { padding: 10px 12px; overflow: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
 .modal-arg { white-space: pre-wrap; word-break: break-word; }
 .modal-foot { display: flex; justify-content: flex-end; padding: 8px 12px; border-top: 1px solid var(--vscode-panel-border); }
+
+/* The summary of a finished prompt, under its rows. */
+.report { margin: 8px 0 4px; padding: 6px 10px; border: 1px solid; border-radius: 4px; background: var(--vscode-editorWidget-background, rgba(128,128,128,.08)); }
+.kinds { width: 100%; margin: 6px 0; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.kinds th { text-align: right; font-weight: normal; opacity: .7; padding: 1px 0 1px 10px; }
+.kinds td { text-align: right; padding: 1px 0 1px 10px; white-space: nowrap; }
+.kinds th:first-child, .kinds td.name { text-align: left; padding-left: 0; width: 100%; max-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.facts { display: grid; gap: 1px; }
+.fact { display: flex; gap: 8px; min-width: 0; }
+.fact .dim { flex: none; width: 70px; }
+.fact .val { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

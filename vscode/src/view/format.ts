@@ -31,6 +31,9 @@ export const fmtTokens = (n: number): string =>
         ? `${Math.round(n / 1000)}k`
         : `${(n / 1_000_000).toFixed(1)}M`
 
+/** `~340 tok` for a count of estimated tokens. */
+export const tokCount = (tokens: number): string => `~${fmtTokens(tokens)} tok`
+
 /** `~340 tok`, or `—` for a text there is none of (yet). */
 export const tokText = (n: Node, which: 'input' | 'output'): string => {
   const len = sizeOf(n, which)

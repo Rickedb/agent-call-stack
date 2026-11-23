@@ -1,20 +1,11 @@
 import type { Node } from '../types'
 import { block } from './blocks'
 import { promptOf, timesOf } from './context'
-import { button, clip, dur, esc, icon, mark, span, statusWord, tint, tokText } from './format'
+import { button, dur, esc, icon, mark, span, statusWord, tint, tokText } from './format'
 import type { Ctx } from './types'
 
-// Who a call ran at the same time as.
-const peers = (c: Ctx, n: Node): string => {
-  const others = (c.together.get(n.id)?.members ?? []).filter(m => m.id !== n.id)
-  if (others.length === 0) return ''
-  const names = others.slice(0, 5).map(m => esc(m.name + (m.arg ? ` ${clip(m.arg, 30)}` : '')))
-  return `<div class="par-text">Ran at the same time as ${others.length} other${others.length === 1 ? '' : 's'}: ${names.join(', ')}${others.length > 5 ? ', …' : ''}</div>`
-}
-
 /**
- * A row's details, in a modal over the view: its state, timing, sizes and who it
- * ran with, then its input and output. A click on the backdrop, the close
+ * A row's details, in a modal over the view: its state, timing, sizes, then its input and output. A click on the backdrop, the close
  * buttons or Esc (media/main.js) closes it. The view can be short, so the body
  * scrolls inside the dialog and not the page behind.
  */
@@ -36,7 +27,6 @@ export const modal = (c: Ctx, n: Node): string => {
         ${n.arg ? `<div class="modal-arg">${esc(n.arg)}</div>` : ''}
         <div class="dim">started +${dur(n.start - t0)} · took ${dur(took)} · ${Math.min(100, Math.round((took / t1) * 100))}% of prompt</div>
         <div class="dim">input ${tokText(n, 'input')} · output ${tokText(n, 'output')}</div>
-        ${peers(c, n)}
         ${block(c, n, 'input')}
         ${block(c, n, 'output')}
       </div>

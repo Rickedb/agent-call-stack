@@ -15,6 +15,8 @@ const dataDir = () => process.env.AI_CALL_TREE_DIR || path.join(os.homedir(), '.
 
 const workspaceFolders = () => (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath)
 
+const hasPrompt = (s: Session) => s.nodes.some(n => n.kind === 'prompt')
+
 const toggle = <T>(set: Set<T>, v: T) => void (set.has(v) ? set.delete(v) : set.add(v))
 
 const hooksInstalled = () =>
@@ -43,6 +45,9 @@ class CallTreeView implements vscode.WebviewViewProvider {
     // A new prompt folds the ones before it; what history there is, folds but the latest.
     collapseOlder(store.model.sessions.values(), this.seen, this.folded)
     ctx.subscriptions.push(
+      vscode.workspace.onDidChangeConfiguration(e => {
+        if (e.affectsConfiguration('chat.useHooks')) this.render()
+      }),
       store.onChange(() => {
         collapseOlder(store.model.sessions.values(), this.seen, this.folded)
         this.render()
@@ -53,7 +58,8 @@ class CallTreeView implements vscode.WebviewViewProvider {
   /** The session drawn: the one picked, else the newest of this workspace. */
   current(): Session | undefined {
     const list = this.store.model.list(workspaceFolders())
-    return (this.picked && list.find(s => s.id === this.picked)) || list[0]
+    // By default the newest one that has a prompt: one that only started has nothing to show.
+    return (this.picked && list.find(s => s.id === this.picked)) || list.find(hasPrompt) || list[0]
   }
 
   resolveWebviewView(view: vscode.WebviewView): void {
@@ -95,8 +101,10 @@ class CallTreeView implements vscode.WebviewViewProvider {
       shown: this.shown,
       now: Date.now(),
       hooksInstalled: hooksInstalled(),
+      hooksOff: vscode.workspace.getConfiguration('chat').get<boolean>('useHooks') === false,
       hasWorkspace: workspaceFolders().length > 0,
-      sessions: list.map(s => ({ id: s.id, label: s.label })),
+      // Sessions with no prompt are noise, unless it is the one picked.
+      sessions: list.filter(s => hasPrompt(s) || s.id === this.picked).map(s => ({ id: s.id, label: s.label })),
       picked: this.picked,
     })
     void view.webview.postMessage({ type: 'render', html, tick })

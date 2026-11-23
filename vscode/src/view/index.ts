@@ -2,7 +2,7 @@ import type { Session } from '../model'
 import { index, makeCtx } from './context'
 import { modal } from './modal'
 import { section } from './rows'
-import { empty, summary, toolbar } from './toolbar'
+import { empty, picker, summary, toolbar } from './toolbar'
 import type { View } from './types'
 
 export type { View } from './types'
@@ -15,7 +15,11 @@ export { renderText } from './text'
  * row picked in `v.selected` opens in a modal over all of it.
  */
 export const renderBody = (s: Session | undefined, v: View): string => {
-  if (!s || !s.nodes.some(n => n.kind === 'prompt')) return empty(v)
+  if (!s || !s.nodes.some(n => n.kind === 'prompt')) {
+    // A session with no prompt keeps the drop-down, or there would be no way back from it.
+    const pick = picker(v)
+    return `${pick ? `<div class="bar">${pick}</div>` : ''}${empty(v)}`
+  }
   const c = makeCtx(s, v)
   const picked = v.selected ? c.byId.get(v.selected) : undefined
   return [
