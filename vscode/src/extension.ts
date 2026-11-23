@@ -7,7 +7,7 @@ import * as vscode from 'vscode'
 import { collapseOlder } from './collapse'
 import { hookFile, installHookFile, installRecorder, removeHookFile } from './hooks'
 import type { Session } from './model'
-import { foldableIds, isRunning, renderBody, renderText } from './render'
+import { foldableIds, isRunning, renderBody, renderText, summaryMarkdown } from './render'
 import { EventStore } from './store'
 
 const VIEW = 'aiCallTree.view'
@@ -153,6 +153,14 @@ class CallTreeView implements vscode.WebviewViewProvider {
       case 'openSettings':
         await vscode.commands.executeCommand('workbench.action.openSettings', 'chat.useHooks')
         break
+      case 'copySummary': {
+        const md = summaryMarkdown(s, m.id ?? '', Date.now())
+        if (md) {
+          await vscode.env.clipboard.writeText(md)
+          void vscode.window.setStatusBarMessage('Call tree: summary copied as markdown', 2000)
+        }
+        break
+      }
       case 'copy':
       case 'copyPath': {
         if (!node || !m.which) break

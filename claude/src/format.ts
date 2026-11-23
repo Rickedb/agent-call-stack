@@ -51,6 +51,12 @@ export const fmtTokens = (n: number) =>
         ? `${Math.round(n / 1000)}k`
         : `${(n / 1_000_000).toFixed(1)}M`
 
+/** A model id as a person says it: `claude-opus-5-5-20260101` is `opus-5-5`; anything else as it is. */
+export const modelName = (m: string) => m.replace(/^claude-/, '').replace(/-\d{8}(?=\]|$)/, '')
+
+/** `340 tok` for a count the API reported, without the "~" of an estimate. */
+export const tokExact = (tokens: number) => `${fmtTokens(tokens)} tok`
+
 /** `~340 tok` for a count of estimated tokens. */
 export const tokCount = (tokens: number) => `~${fmtTokens(tokens)} tok`
 

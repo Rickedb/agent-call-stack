@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { reportOf } from './src/stats'
+import { modelOf, reportOf } from './src/stats'
 
 const PANE = {
   plugin: 'ai-call-tree',
@@ -385,4 +385,85 @@ test('the summary counts calls by tool, tokens, time in calls, and skips history
   expect(reportOf({ ...top, status: 'run' as const }, below, 20_000)).toBeUndefined()
   expect(reportOf({ ...top, hist: true as const }, below, 20_000)).toBeUndefined()
   expect(reportOf(top, [], 20_000)).toBeUndefined()
+})
+
+test('a prompt and its subagent show the model they ran on', async ($, on) => {
+  on('command.register', () => ({ value: { command: 'call-tree' } }))
+  on('ui.open', () => ({ value: { isPlaced: true } }))
+  on('clock.every', () => ({ value: null }))
+  on('session.start', (_, e) => ({ cwd: e.cwd }))
+  on('turn.start', (_, e) => ({ turnId: e.turnId }))
+  on('turn.step', async function* (_, e) {
+    return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'end_turn', usage: null } as never
+  })
+  on('agent.spawn', () => ({ model: 'claude-haiku-5-5-20260101', agentId: 'ag1' }))
+  on('tool.call', () => ({ result: {}, text: 'ok' }))
+  on('turn.complete', (_, e) => ({ text: e.answer ?? '', usage: { model: 'claude-opus-5-5' } as never }))
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'ask', turnId: 'tm' })
+  // The step names the model while the prompt still runs.
+  const stream = $.turn.step({ turnId: 'tm', index: 0, model: 'claude-opus-5-5' } as never)
+  for await (const _ of stream) void _
+  let ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  expect(await ui.find({ type: 'Text', text: /^ opus-5-5$/ })).toBeDefined()
+  await ui.unmount()
+
+  await $.agent.spawn({ prompt: 'look', description: 'look around', subagentType: 'Explore' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'ls' })
+  const usage = { model: 'claude-opus-5-5', input_tokens: 800, output_tokens: 520, cache_read_input_tokens: 4000, cache_creation_input_tokens: 0 }
+  await $.turn.complete({ turnId: 'tm', reason: 'answer', answer: 'done', usage } as never)
+
+  ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  // The date a model id carries is dropped.
+  expect(await ui.find({ type: 'Text', text: /^ haiku-5-5$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^ opus-5-5$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Models\s+opus-5-5 \(prompt\) · haiku-5-5 \(1 subagent\)/ })).toBeDefined()
+  // What the API reported replaces the estimate in the summary; the estimate stays for the calls' text.
+  expect(await ui.find({ type: 'Text', text: /Tokens\s+in 4\.8k tok · out 520 tok · total 5\.3k tok \(reported\)/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Cache\s+83% of input from cache · 4\.0k tok read · 0 tok written/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Call text\s+in ~\d+ tok · out ~\d+ tok \(estimated/ })).toBeDefined()
+  // The prompt's details give its own reported usage.
+  await ui.press({ key: 'open:tm' })
+  expect(await ui.find({ type: 'Text', text: /reported in 4\.8k tok \(4\.0k tok cached\) · out 520 tok · subagents not included/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a tool call is called by the model of the loop it ran in', () => {
+  const row = (id: string, parent: string | undefined, kind: 'prompt' | 'agent' | 'tool', model?: string) =>
+    ({ id, parent, kind, name: id, arg: '', status: 'ok' as const, start: 0, end: 1, ...(model ? { model } : {}) })
+  const list = [row('p', undefined, 'prompt', 'claude-opus-5-5'), row('a', 'p', 'agent', 'claude-haiku-5-5'), row('t1', 'a', 'tool'), row('t2', 'p', 'tool')]
+  expect(modelOf(list, list[2]!)).toBe('claude-haiku-5-5')
+  expect(modelOf(list, list[3]!)).toBe('claude-opus-5-5')
+  expect(modelOf(list, list[1]!)).toBe('claude-haiku-5-5')
+  expect(modelOf([row('x', undefined, 'tool')], row('x', undefined, 'tool'))).toBeUndefined()
+})
+
+test('the summary copies as markdown', async ($, on) => {
+  const held = injected()
+  const nodes = (held.nodes as [string, any[]])[1]
+  Object.assign(nodes.find(n => n.id === 'g1'), { name: 'Bash', arg: 'echo a | b `x`', outputLen: 4000 })
+  Object.assign(nodes.find(n => n.id === 'g3'), { status: 'err' })
+  on('state.get', (_, e) => {
+    const one = held[String(e.key)]
+    return one ? { value: { value: { shape: one[0], value: one[1] }, version: 1 } } : { value: null }
+  })
+  const copied: string[] = []
+  on('ui.copy', (_, e) => {
+    copied.push(e.text)
+    return { value: { ok: true } } as never
+  })
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'copy-summary:p1' })
+  expect(copied.length).toBe(1)
+  const md = copied[0] ?? ''
+  expect(md).toMatch(/^## Prompt 1 summary\n/)
+  expect(md).toMatch(/- \*\*Tool calls:\*\* 4 \(1 failed\) · took 2\.0s/)
+  expect(md).toMatch(/- \*\*Subagents:\*\* 1 · longest Explore 1\.8s/)
+  // The table has a row a tool, and nothing in a name or argument breaks it.
+  expect(md).toMatch(/\| Tool \| Calls \| Avg \| Total \| Tokens \(est\.\) \|\n\| --- \| ---: \| ---: \| ---: \| ---: \|\n/)
+  expect(md).toMatch(/\| Bash \(1 failed\) \| 2 \|/)
+  expect(md).toMatch(/\*\*Heaviest call:\*\* Bash `echo a \| b 'x'` ~1\.0k tok/)
+  await ui.unmount()
 })

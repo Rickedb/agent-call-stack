@@ -103,3 +103,6 @@ hr { border: 0; border-top: 1px solid var(--vscode-panel-border); margin: 12px 0
 .fact { display: flex; gap: 8px; min-width: 0; }
 .fact .dim { flex: none; width: 70px; }
 .fact .val { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.report-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.head-text { min-width: 0; }

@@ -1,7 +1,8 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { Node } from '../../types'
-import { dur, tokText } from '../format'
+import { dur, modelName, tokExact, tokText } from '../format'
+import { modelOf } from '../stats'
 import { clearSelected } from '../state'
 import { block } from './block'
 import type { Pane } from './context'
@@ -10,6 +11,7 @@ import { mark, tint } from './theme'
 // What opens under a row: its state, timing, sizes, and its input and output.
 export function details($: EngineInterface, c: Pane, n: Node, t0: number, t1: number) {
   const { Box, Text, Button } = c.els
+  const model = modelOf(c.list, n)
   return (
     <Box
       flexDirection="column"
@@ -38,6 +40,12 @@ export function details($: EngineInterface, c: Pane, n: Node, t0: number, t1: nu
           </Text>
         )}
         <Text dimColor>{`input ${tokText(n, 'input')} · output ${tokText(n, 'output')}`}</Text>
+        {n.usage ? (
+          <Text dimColor>
+            {`reported in ${tokExact(n.usage.input + n.usage.cacheRead + n.usage.cacheWrite)} (${tokExact(n.usage.cacheRead)} cached) · out ${tokExact(n.usage.output)} ${n.kind === 'prompt' ? '· subagents not included' : ''}`.trim()}
+          </Text>
+        ) : null}
+        {model ? <Text dimColor>{`${n.model ? 'model' : 'called by'} ${modelName(model)}`}</Text> : null}
       </Box>
       {block($, c, n, 'input')}
       {block($, c, n, 'output')}

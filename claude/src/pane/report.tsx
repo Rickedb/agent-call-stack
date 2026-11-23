@@ -1,7 +1,10 @@
+import type { EngineInterface } from 'claude-code'
+
 import type { Node } from '../../types'
-import { clip, dur, tokCount } from '../format'
+import { clip, dur, modelName, tokCount, tokExact } from '../format'
 import { reportOf, type Report } from '../stats'
 import type { Pane } from './context'
+import { reportMarkdown } from './markdown'
 import { tint } from './theme'
 
 const MAX_KINDS = 8
@@ -11,10 +14,13 @@ const named = (n: Node) => `${n.name}${n.arg ? ` ${n.arg}` : ''}`
 // What a finished prompt did, under its rows: the calls by tool, the slowest and
 // the heaviest, and the tokens (estimates). Nothing while it runs, or for a
 // prompt read back from history.
-export function report(c: Pane, top: Node) {
-  const { Box, Text } = c.els
+export function report($: EngineInterface, c: Pane, top: Node) {
+  const { Box, Text, Button } = c.els
   const r: Report | undefined = reportOf(top, c.below(top), c.now)
   if (!r) return null
+
+  // What went into the model, cached or not: the API counts the three apart.
+  const sent = r.usage ? r.usage.input + r.usage.cacheRead + r.usage.cacheWrite : 0
 
   // The room inside the border and its padding.
   const room = Math.max(10, c.cols - 4)
@@ -53,10 +59,23 @@ export function report(c: Pane, top: Node) {
 
   return (
     <Box flexDirection="column" borderStyle="round" borderColor={tint(top)} paddingX={1} marginTop={1}>
-      <Text bold wrap="truncate">
-        Summary
-        <Text dimColor>{` · ${verdict} · took ${dur(r.wall)} · ${pct(r.busy, r.wall)}% of it in calls`}</Text>
-      </Text>
+      <Box justifyContent="space-between">
+        <Box flexShrink={1} overflow="hidden">
+          <Text bold wrap="truncate">
+            Summary
+            <Text dimColor>{` · ${verdict} · took ${dur(r.wall)} · ${pct(r.busy, r.wall)}% of it in calls`}</Text>
+          </Text>
+        </Box>
+        <Box flexShrink={0} paddingLeft={1}>
+          <Button
+            key={`copy-summary:${top.id}`}
+            plain
+            onPress={p => void $.ui.copy({ text: reportMarkdown(`Prompt ${c.promptNo.get(top.id)}`, top, r), surface: p.surface })}
+          >
+            Copy as markdown
+          </Button>
+        </Box>
+      </Box>
       {r.kinds.length ? (
         <Box flexDirection="column" marginTop={1}>
           <Text mono dimColor wrap="truncate">
@@ -79,7 +98,30 @@ export function report(c: Pane, top: Node) {
         {r.slowest ? line('Average', `${dur(Math.round(r.avg))} a tool call`) : null}
         {r.slowest ? line('Slowest', `${named(r.slowest)}  ${dur(r.slowest.end! - r.slowest.start)}`) : null}
         {r.heaviest ? line('Heaviest', `${named(r.heaviest)}  ${tokCount(r.heavy)}`) : null}
-        {line('Tokens', `in ${tokCount(r.input)} · out ${tokCount(r.output)} · total ${tokCount(r.input + r.output)} (estimated)`)}
+        {r.models.length
+          ? line(
+              'Models',
+              r.models
+                .map(m => {
+                  const who = [m.main ? 'prompt' : '', m.agents ? `${m.agents} ${m.agents === 1 ? 'subagent' : 'subagents'}` : ''].filter(Boolean)
+                  return `${modelName(m.model)} (${who.join(', ')})`
+                })
+                .join(' · '),
+            )
+          : null}
+        {r.usage
+          ? line(
+              'Tokens',
+              `in ${tokExact(sent)} · out ${tokExact(r.usage.output)} · total ${tokExact(sent + r.usage.output)} (reported)`,
+            )
+          : line('Tokens', `in ${tokCount(r.input)} · out ${tokCount(r.output)} · total ${tokCount(r.input + r.output)} (estimated)`)}
+        {r.usage && sent > 0
+          ? line(
+              'Cache',
+              `${pct(r.usage.cacheRead, sent)}% of input from cache · ${tokExact(r.usage.cacheRead)} read · ${tokExact(r.usage.cacheWrite)} written`,
+            )
+          : null}
+        {r.usage ? line('Call text', `in ${tokCount(r.input)} · out ${tokCount(r.output)} (estimated, what the calls were given and returned)`) : null}
         {facts.map(f => line('Subagents', f))}
       </Box>
     </Box>

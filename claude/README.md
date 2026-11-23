@@ -21,7 +21,16 @@ Stack (innermost first)
 
 ## Tokens
 
-Each row shows the size of its output in tokens (`~340 tok`), and a row's details show both the input and the output. These are estimates, at four characters a token, from the whole text. The engine gives no count per call, so every row is estimated alike. The [Copilot port](../vscode/README.md) does the same.
+Two kinds of figure, told apart in the pane:
+
+- **Reported** (`4.8k tok`, no `~`): what the API counted for a prompt's turn and for each subagent's own turns, from `turn.complete`. A row's details say it (`reported in 4.8k tok (4.0k tok cached) · out 520 tok`); a prompt's excludes its subagents, which have their own rows. The summary adds them up (input counts what the cache served and wrote too) and says how much came from the cache.
+- **Estimated** (`~340 tok`): what the API does not count per call, so a tool call's input and output, and the text of a prompt or subagent, at four characters a token from the whole text. Each row's output size and a row's details use these, and so does the summary's "Call text" line. A prompt with no reported usage (an interrupt, an API error) falls back to estimating all of it.
+
+The [Copilot port](../vscode/README.md) estimates everything: its hooks carry no usage.
+
+## Models
+
+A prompt and each subagent show the model they ran on, in color after their name (`Prompt 1 opus-5-5`; the date a model id carries is dropped). A prompt's model is read from its first model response and settled at its end, from what the API says answered (a fallback can change it). A subagent's is the one its spawn resolved to. A tool call has none of its own: its details say which model called it, the model of the prompt or subagent it ran in. A finished prompt's summary lists the models used. The [Copilot port](../vscode/README.md) has no model: its hooks do not carry one.
 
 ## Summary of a finished prompt
 
@@ -30,8 +39,11 @@ When a prompt has finished and made at least one call, a summary ends its rows (
 - **Calls**: the tool calls, how many failed, how long the prompt took, and how much of that some call was running (overlaps count once).
 - **By tool**: one line per tool, the most called first, with its calls, average time, total time and tokens, and its failures.
 - **Average**, **slowest** and **heaviest** call (the one that moved the most text, in plus out).
-- **Tokens**: in (the prompt and every call's input), out (the answer and every call's output) and the total. Estimates, as above: the engine gives no count per call.
+- **Tokens**: in, out and total, as the API reported them for the prompt and its subagents; the **cache** line says how much input came from the cache, and **call text** the estimate of what the tools were given and returned. With no reported usage the tokens line is the estimate (the prompt and every call's input, the answer and every call's output).
+- **Models**: the models the prompt and its subagents ran on.
 - **Subagents**: how many, how many failed, and the longest. They are not counted as tool calls, and their time overlaps their own calls.
+
+**Copy as markdown** (a button on the summary) puts the whole summary on the clipboard as markdown: a bullet list of the figures and a table with every tool, for a ticket, a PR or a chat. `src/pane/markdown.ts` builds it.
 
 ## Use
 
@@ -51,7 +63,7 @@ src/recording.ts      turns, subagents and tool calls into rows
 src/pane/             drawing the rows: index (reads state, picks the view),
                       toolbar, section, row, bar, details, block, widget, theme,
                       cells (the right-hand columns), report (the summary)
-src/stats.ts          the summary's numbers, from a prompt's rows
+src/stats.ts          the summary's numbers, from a prompt's rows, and modelOf
 src/state.ts          every atom, and every read and write of the state
 src/history.ts        reads the chat's earlier messages into rows
 src/nodes.ts          row bookkeeping: upsert, patch, keep (cut text to a file), guard

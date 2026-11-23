@@ -1,4 +1,4 @@
-import type { Node } from '../types'
+import type { Node, Usage } from '../types'
 import { sizeOf } from './format'
 
 /** One kind of tool: how often it ran, how long it took, how much text went through it. */
@@ -35,6 +35,19 @@ export type Report = {
   input: number
   output: number
   agents: { count: number; failed: number; ms: number; longest?: Node }
+  /** The models the prompt and its subagents ran on, the prompt's first. */
+  models: { model: string; main: boolean; agents: number }[]
+  /** What the API reported for the prompt's turn and its subagents', summed; undefined when it reported none. */
+  usage?: Usage
+}
+
+/** The model a row ran on: its own, else its nearest ancestor's (a tool call is the loop's). */
+export const modelOf = (list: Node[], n: Node): string | undefined => {
+  const byId = new Map(list.map(x => [x.id, x]))
+  for (let cur: Node | undefined = n; cur; cur = cur.parent ? byId.get(cur.parent) : undefined) {
+    if (cur.model) return cur.model
+  }
+  return undefined
 }
 
 const tok = (n: Node, which: 'input' | 'output') => Math.ceil(sizeOf(n, which) / 4)
@@ -93,6 +106,17 @@ export const reportOf = (top: Node, below: Node[], now: number): Report | undefi
   }
   if (to > from) busy += to - from
 
+  const models: Report['models'] = []
+  for (const n of [top, ...agents]) {
+    if (!n.model) continue
+    let one = models.find(m => m.model === n.model)
+    if (!one) {
+      one = { model: n.model, main: false, agents: 0 }
+      models.push(one)
+    }
+    if (n === top) one.main = true
+    else one.agents++
+  }
   const agentDone = agents.filter(n => n.end !== undefined)
   return {
     calls: tools.length,
@@ -112,5 +136,13 @@ export const reportOf = (top: Node, below: Node[], now: number): Report | undefi
       ms: agentDone.reduce((t, n) => t + took(n), 0),
       longest: [...agentDone].sort((a, b) => took(b) - took(a))[0],
     },
+    models,
+    usage: [top, ...agents].reduce<Usage | undefined>((sum, n) => {
+      if (!n.usage) return sum
+      const u = n.usage
+      return sum
+        ? { input: sum.input + u.input, output: sum.output + u.output, cacheRead: sum.cacheRead + u.cacheRead, cacheWrite: sum.cacheWrite + u.cacheWrite }
+        : { ...u }
+    }, undefined),
   }
 }

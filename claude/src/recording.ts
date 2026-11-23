@@ -1,8 +1,17 @@
-import type { On } from 'claude-code'
+import type { EngineInterface, On } from 'claude-code'
 
 import { clip, describe, summarize } from './format'
-import { guard, keep, patch, upsert } from './nodes'
+import { addUsage, guard, keep, patch, upsert } from './nodes'
 import { foldIds, readNodes, readRoot, setRoot, updateNodes } from './state'
+
+// Says which model a row ran on; nothing is written when it is already said, since
+// every model response of a turn asks.
+async function noteModel($: EngineInterface, id: string, model: string | undefined) {
+  if (!model) return
+  const row = (await readNodes($)).find(n => n.id === id)
+  if (!row || row.model === model) return
+  await updateNodes($, list => patch(list, id, { model }))
+}
 
 // What is seen of the work, as it happens: a prompt, a subagent, a tool call
 // and its result, each a row in the state.
@@ -34,14 +43,31 @@ export const recording = (on: On) => {
     return next(e)
   })
 
+  // The model of each response of the prompt's turn; a subagent's is known at its spawn.
+  on('turn.step', async function* ($, e, next) {
+    await guard($, 'model', () => noteModel($, e.turnId, e.model))
+    return yield* next(e)
+  })
+
   on('turn.complete', async ($, e, next) => {
+    const id = e.agentId === undefined ? e.turnId : `a:${e.agentId}`
     await guard($, 'turn end', async () => {
-      const id = e.agentId === undefined ? e.turnId : `a:${e.agentId}`
       const status = e.reason === 'answer' ? 'ok' : 'err'
       const text = await keep($, id, 'output', e.answer || `(${e.reason})`)
-      await updateNodes($, list => patch(list, id, { status, end: Date.now(), ...text }))
+      const used = e.usage
+      await updateNodes($, list =>
+        patch(list, id, {
+          status,
+          end: Date.now(),
+          ...text,
+          ...(used ? { usage: addUsage(list.find(n => n.id === id)?.usage, used) } : {}),
+        }),
+      )
     })
-    return next(e)
+    const out = await next(e)
+    // What answered, as the API reports it: the last response's, which a fallback may have changed.
+    await guard($, 'model', () => noteModel($, id, out.usage?.model))
+    return out
   })
 
   on('agent.spawn', async ($, e, next) => {
@@ -58,6 +84,7 @@ export const recording = (on: On) => {
             kind: 'agent',
             name: e.subagentType,
             arg: clip(e.description, 160),
+            model: out.model,
             status: 'run',
             start: Date.now(),
             ...text,

@@ -1,3 +1,13 @@
+/** Token counts the API reported for a turn (summed over a loop's turns), not estimated. */
+export type Usage = {
+  /** Uncached input tokens. */
+  input: number
+  output: number
+  /** Input served from, and written to, the prompt cache. */
+  cacheRead: number
+  cacheWrite: number
+}
+
 export type Node = {
   id: string
   parent?: string
@@ -21,6 +31,10 @@ export type Node = {
   outputFile?: string
   /** Read back from the chat's history: it has no start or end time. */
   hist?: true
+  /** The model a prompt or subagent ran on, as the engine reports it. A tool call has none: it is the loop's. */
+  model?: string
+  /** What the API reported the turn used: a prompt's, or a subagent's own loop. A tool call has none. */
+  usage?: Usage
   /** A duration the history did record, in milliseconds (an agent's). */
   ms?: number
 }

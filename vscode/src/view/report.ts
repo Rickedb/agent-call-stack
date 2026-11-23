@@ -1,6 +1,6 @@
 import { reportOf } from '../stats'
 import type { Node } from '../types'
-import { clip, dur, esc, tint, tokCount } from './format'
+import { button, clip, dur, esc, tint, tokCount } from './format'
 import type { Ctx } from './types'
 
 const MAX_KINDS = 8
@@ -48,8 +48,11 @@ export const report = (c: Ctx, top: Node): string => {
   ].join('')
 
   return `<div class="report tint-${tint(top)}-border">
-      <div><b>Summary</b>
-        <span class="dim"> · ${r.calls} tool calls${r.failed ? ` · ${r.failed} failed` : ''} · took ${dur(r.wall)} · ${pct(r.busy, r.wall)}% of it in calls</span></div>
+      <div class="report-head">
+        <div class="head-text"><b>Summary</b>
+          <span class="dim"> · ${r.calls} tool calls${r.failed ? ` · ${r.failed} failed` : ''} · took ${dur(r.wall)} · ${pct(r.busy, r.wall)}% of it in calls</span></div>
+        ${button('copySummary', 'Copy as markdown', `data-id="${esc(top.id)}"`, 'plain')}
+      </div>
       ${table}
       <div class="facts">${facts}</div>
     </div>`

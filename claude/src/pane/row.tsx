@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
-import { clip } from '../format'
+import { clip, modelName } from '../format'
 import { toggleFolded, toggleSelected } from '../state'
 import { bar } from './bar'
 import { cellsOf, WIDE } from './cells'
@@ -27,7 +27,8 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
   const barCol = c.barW ? c.barW + 1 : 0
   const room =
     c.cols - lead - 2 - (isSlowest ? 8 : 0) - tokCol - (s.timeW + 1) - barCol - 1
-  const arg = clip(node.arg, room - name.length - 1)
+  const model = node.model ? modelName(node.model) : ''
+  const arg = clip(node.arg, room - name.length - (model ? model.length + 1 : 0) - 1)
 
   return (
     <Box flexDirection="column">
@@ -63,6 +64,7 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
               <Text bold={isPicked || node.kind !== 'tool'} wrap="truncate-end">
                 {name}
               </Text>
+              {model ? <Text color="permission">{` ${model}`}</Text> : null}
               {arg ? (
                 <Text dimColor wrap="truncate-end">
                   {` ${arg}`}

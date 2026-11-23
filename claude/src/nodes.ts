@@ -1,6 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
-import type { Node } from '../types'
+import type { Node, Usage } from '../types'
 import { FILE_MAX, KEEP, MAX_NODES } from './config'
 
 export const upsert = (list: Node[], node: Node): Node[] => {
@@ -9,6 +9,17 @@ export const upsert = (list: Node[], node: Node): Node[] => {
     i < 0 ? [...list, node] : list.map((n, j) => (j === i ? { ...n, ...node, start: n.start } : n))
   return next.slice(-MAX_NODES)
 }
+
+// A loop's reported usage, summed over its turns (a subagent is woken more than once).
+export const addUsage = (
+  was: Usage | undefined,
+  u: { input_tokens: number; output_tokens: number; cache_read_input_tokens: number; cache_creation_input_tokens: number },
+): Usage => ({
+  input: (was?.input ?? 0) + u.input_tokens,
+  output: (was?.output ?? 0) + u.output_tokens,
+  cacheRead: (was?.cacheRead ?? 0) + u.cache_read_input_tokens,
+  cacheWrite: (was?.cacheWrite ?? 0) + u.cache_creation_input_tokens,
+})
 
 export const patch = (list: Node[], id: string, fields: Partial<Node>): Node[] =>
   list.map(n => (n.id === id ? { ...n, ...fields } : n))

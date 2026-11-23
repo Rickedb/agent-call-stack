@@ -57,7 +57,7 @@ export function section($: EngineInterface, c: Pane, top: Node) {
         </Box>
       ) : null}
       {rows.map(r => row($, c, s, r))}
-      {c.fold.has(top.id) ? null : report(c, top)}
+      {c.fold.has(top.id) ? null : report($, c, top)}
     </Box>
   )
 }

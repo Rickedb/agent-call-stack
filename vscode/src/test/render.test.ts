@@ -2,7 +2,7 @@ import * as assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { Session } from '../model'
-import { renderBody, renderText, tokText, type View } from '../render'
+import { renderBody, renderText, summaryMarkdown, tokText, type View } from '../render'
 import type { Ev } from '../types'
 
 let t = 1000
@@ -300,4 +300,29 @@ test('the text tree ends with the summary of a finished prompt', () => {
   assert.match(text, /Read {2}2x/)
   assert.match(text, /tokens \(estimated\): in ~\d+ tok, out ~[\d.]+k tok, total/)
   assert.doesNotMatch(renderText(basic(), t + 500), /Summary:/)
+})
+
+test('the summary has a copy button, and copies as markdown', () => {
+  const s = finished()
+  const top = s.nodes.find(n => n.kind === 'prompt')
+  assert.match(renderBody(s, view()), new RegExp(`data-act="copySummary" data-id="${top?.id}"`))
+  const md = summaryMarkdown(s, top?.id ?? '', t + 500) ?? ''
+  assert.match(md, /^## Prompt 1 summary\n\n> work\n/)
+  assert.match(md, /- \*\*Tool calls:\*\* 3 · took /)
+  assert.match(md, /- \*\*Heaviest call:\*\* Read `a\.ts` ~1\.0k tok/)
+  assert.match(md, /\| Tool \| Calls \| Avg \| Total \| Tokens \(est\.\) \|\n\| --- \| ---: \| ---: \| ---: \| ---: \|\n\| Read \| 2 \|/)
+  // Nothing while it runs, or for an id that is not a prompt.
+  assert.equal(summaryMarkdown(basic(), basic().nodes[0]?.id ?? '', t), undefined)
+  assert.equal(summaryMarkdown(s, 'nope', t), undefined)
+})
+
+test('what a call says cannot break the markdown table or its code', () => {
+  const s = session(
+    ev({ kind: 'prompt', arg: 'p' }),
+    ev({ kind: 'tool_pre', tool: 'Bash', arg: 'echo a | b `x`', toolUseId: 'u' }),
+    ev({ kind: 'tool_post', tool: 'Bash', toolUseId: 'u', output: 'y'.repeat(400) }),
+    ev({ kind: 'stop', output: 'done' }),
+  )
+  const md = summaryMarkdown(s, s.nodes[0]?.id ?? '', t + 500) ?? ''
+  assert.match(md, /Heaviest call:\*\* Bash `echo a \| b 'x'`/)
 })

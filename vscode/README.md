@@ -54,6 +54,8 @@ When a prompt has finished and made at least one call, a summary ends its rows (
 - **Tokens**: in (the prompt and every call's input), out (the answer and every call's output) and the total. Estimates, as above: Copilot's hooks give no token counts. `@calltree` ends with the same figures as text.
 - **Subagents**: how many, how many failed, and the longest. They are not counted as tool calls, and their time overlaps their own calls.
 
+**Copy as markdown** (a button on the summary) puts the whole summary on the clipboard as markdown: a bullet list of the figures and a table with every tool, for a ticket, a PR or a chat. `src/view/markdown.ts` builds it.
+
 ## Use
 
 1. Build and install the extension (see Develop).
@@ -70,6 +72,8 @@ Other commands: **Remove Copilot Hooks**, **Clear Recorded Calls**. Setting `aiC
 
 ## Differences from the Claude Code mod
 
+- **Tokens are all estimates.** The Claude Code mod shows what the API reported for a prompt and each subagent, and the cache split; Copilot's hooks carry no usage.
+- **No model.** Claude Code shows the model each prompt and subagent ran on. Copilot's hooks do not carry one, so this view cannot.
 - **No history backfill.** The mod read the chat's earlier messages when it loaded. Here only what happens after the hooks are installed is recorded (the log does survive reloads, so earlier recorded sessions come back).
 - **Call pairing is best effort.** Some Copilot hosts give tool calls no id. Then a result is paired with its call by tool and arguments, oldest first, which can swap two identical parallel calls.
 - **Subagents.** Copilot's start event may carry no subagent id. Calls inside a subagent are bound to the oldest subagent still waiting for one. The built-in `general-purpose` agent may fire no start/stop events at all (per GitHub's docs), and then it is not drawn.
@@ -84,6 +88,7 @@ The panel's drawing is one file a concern in `src/view/`, with `src/render.ts` a
 src/view/index.ts     renderBody: toolbar, counts, a section per prompt (newest first), the modal
 src/view/rows.ts      a prompt's rows: guide lines, bars
 src/view/report.ts    the summary of a finished prompt (numbers from src/stats.ts)
+src/view/markdown.ts  the summary as markdown, for its copy button
 src/view/modal.ts     a row's details in the modal
 src/view/blocks.ts    one input or output text, with Show all and Copy
 src/view/toolbar.ts   the buttons, the counts, the empty state

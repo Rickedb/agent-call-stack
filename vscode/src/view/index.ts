@@ -8,6 +8,7 @@ import type { View } from './types'
 export type { View } from './types'
 export { LINES } from './types'
 export { clip, dur, esc, fmtTokens, tokText } from './format'
+export { summaryMarkdown } from './markdown'
 export { renderText } from './text'
 
 /**
