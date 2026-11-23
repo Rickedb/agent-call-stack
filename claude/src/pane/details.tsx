@@ -1,15 +1,23 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { Node } from '../../types'
-import { dur, tokText } from '../format'
+import { clip, dur, tokText } from '../format'
 import { clearSelected } from '../state'
 import { block } from './block'
 import type { Pane } from './context'
-import { icon, mark, tint } from './theme'
+import { mark, PARALLEL, tint } from './theme'
 
 // What opens under a row: its state, timing, sizes, and its input and output.
 export function details($: EngineInterface, c: Pane, n: Node, t0: number, t1: number) {
   const { Box, Text, Button } = c.els
+  // Who a call ran at the same time as.
+  const others = (c.together.get(n.id)?.members ?? []).filter(m => m.id !== n.id)
+  const together = others.length
+    ? `∥ ran at the same time as ${others.length} other${others.length === 1 ? '' : 's'}: ${others
+        .slice(0, 5)
+        .map(m => m.name + (m.arg ? ` ${clip(m.arg, 30)}` : ''))
+        .join(', ')}${others.length > 5 ? ', …' : ''}`
+    : ''
   return (
     <Box
       flexDirection="column"
@@ -23,7 +31,7 @@ export function details($: EngineInterface, c: Pane, n: Node, t0: number, t1: nu
       <Box flexDirection="column">
         <Text>
           <Text color={tint(n)} bold>
-            {icon(n)} {mark(n)} {n.status === 'run' ? 'Running' : n.status === 'ok' ? 'Done' : 'Failed'}
+            {mark(n)} {n.status === 'run' ? 'Running' : n.status === 'ok' ? 'Done' : 'Failed'}
           </Text>
           <Text dimColor> · {n.kind}</Text>
         </Text>
@@ -38,6 +46,7 @@ export function details($: EngineInterface, c: Pane, n: Node, t0: number, t1: nu
           </Text>
         )}
         <Text dimColor>{`input ${tokText(n, 'input')} · output ${tokText(n, 'output')}`}</Text>
+        {together ? <Text color={PARALLEL}>{together}</Text> : null}
       </Box>
       {block($, c, n, 'input')}
       {block($, c, n, 'output')}

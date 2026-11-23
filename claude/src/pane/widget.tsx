@@ -1,7 +1,7 @@
 import type { Node } from '../../types'
 import { clip, dur } from '../format'
 import type { Pane } from './context'
-import { icon, mark, tint } from './theme'
+import { mark, tint } from './theme'
 
 // A small seat: what runs now, at a glance.
 export const widget = (c: Pane) => {
@@ -12,7 +12,7 @@ export const widget = (c: Pane) => {
   return (
     <Box flexDirection="column">
       <Text bold color={tint(inner)}>
-        {icon(inner)} {mark(inner)} {clip(inner.name + (inner.arg ? ` ${inner.arg}` : ''), c.cols - 5)}
+        {mark(inner)} {clip(inner.name + (inner.arg ? ` ${inner.arg}` : ''), c.cols - 5)}
       </Text>
       <Text dimColor>
         {live.length} running · {dur(c.span(last))}

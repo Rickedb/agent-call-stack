@@ -55,10 +55,12 @@ hr { border: 0; border-top: 1px solid var(--vscode-panel-border); margin: 12px 0
 
 .empty { padding: 12px 0; }
 .empty p { color: var(--vscode-descriptionForeground); }
+.empty .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+.empty code { font-family: var(--vscode-editor-font-family); }
 
 .section.wf .item { margin-bottom: 6px; }
 .axis { display: flex; justify-content: space-between; margin: 0 0 4px 0; }
-.row { display: flex; align-items: center; gap: 4px; min-height: 22px; border-radius: 3px; }
+.row { display: flex; align-items: center; gap: 4px; height: 22px; border-radius: 3px; }
 .row:hover { background: var(--vscode-list-hoverBackground); }
 .row.sel { background: var(--vscode-list-inactiveSelectionBackground); }
 .indent { flex: none; }
@@ -69,7 +71,28 @@ hr { border: 0; border-top: 1px solid var(--vscode-panel-border); margin: 12px 0
 .track { height: 6px; margin: 0 0 0 18px; background: var(--vscode-editorWidget-background, rgba(128,128,128,.15)); border-radius: 2px; overflow: hidden; }
 .fill { height: 100%; border-radius: 2px; }
 
-.details { border: 1px solid; border-radius: 6px; padding: 8px 10px; margin: 6px 0 10px 18px; display: flex; flex-direction: column; gap: 8px; }
 .block pre { margin: 2px 0; padding: 6px 8px; background: var(--vscode-textCodeBlock-background); font-family: var(--vscode-editor-font-family); font-size: var(--vscode-editor-font-size); white-space: pre-wrap; word-break: break-word; border-radius: 3px; }
 .actions { display: flex; gap: 12px; }
 .tok { flex: none; font-variant-numeric: tabular-nums; }
+
+/* Guide lines of the tree, over the whole item; a parallel branch is drawn thicker and in its own color. */
+:root { --c-par: var(--vscode-charts-orange, #d18616); --c-guide: var(--vscode-tree-indentGuidesStroke, rgba(128,128,128,.55)); }
+.item { position: relative; }
+.lane { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid var(--c-guide); pointer-events: none; }
+.lane.l { bottom: auto; height: 11px; }
+.lane.t::after, .lane.l::after { content: ''; position: absolute; left: 0; top: 11px; width: 8px; border-top: 1px solid var(--c-guide); }
+.lane.l::after { top: 10px; }
+.lane.par { border-left: 2px solid var(--c-par); }
+.lane.par::after { border-top: 2px solid var(--c-par) !important; }
+.par-tag { flex: none; color: var(--c-par); font-variant-numeric: tabular-nums; }
+.par-text { color: var(--c-par); }
+
+/* The details of a row, in a modal over the panel. The body scrolls inside the dialog. */
+.overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 12px; }
+.backdrop { position: absolute; inset: 0; background: rgba(0, 0, 0, .5); }
+.modal { position: relative; width: min(100%, 780px); max-height: 100%; display: flex; flex-direction: column; background: var(--vscode-editorWidget-background, #252526); color: var(--vscode-foreground); border: 1px solid; border-radius: 6px; box-shadow: 0 8px 32px rgba(0, 0, 0, .5); outline: none; }
+.modal-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--vscode-panel-border); }
+.modal-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.modal-body { padding: 10px 12px; overflow: auto; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.modal-arg { white-space: pre-wrap; word-break: break-word; }
+.modal-foot { display: flex; justify-content: flex-end; padding: 8px 12px; border-top: 1px solid var(--vscode-panel-border); }

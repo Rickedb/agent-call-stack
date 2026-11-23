@@ -12,9 +12,10 @@ export const tint = (n: Node) =>
           ? 'permission'
           : 'success'
 
-// What a node is: an icon per kind. Emoji take no color, so the status
-// stays beside it as a small tinted mark.
-const KIND_ICON: Record<Node['kind'], string> = { prompt: '💬', agent: '🤖', tool: '🔧' }
-export const icon = (n: Node) => KIND_ICON[n.kind]
+// Calls that ran at the same time: their own color, not the status ones.
+export const PARALLEL = 'suggestion'
 
+// One glyph says how a row stands, in the color of its tint; the kind shows in
+// the name (a prompt and a subagent in bold) and the tint, not in an emoji,
+// whose width the terminals do not agree on and which takes no color.
 export const mark = (n: Node) => (n.status === 'run' ? '●' : n.status === 'ok' ? '✓' : '✗')

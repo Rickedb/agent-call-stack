@@ -20,7 +20,7 @@
   ],
   "contributes": {
     "viewsContainers": {
-      "panel": [
+      "activitybar": [
         {
           "id": "aiCallTree",
           "title": "Call Tree",
@@ -46,7 +46,8 @@
       {
         "command": "aiCallTree.installHooks",
         "title": "Install Copilot Hooks",
-        "category": "Call Tree"
+        "category": "Call Tree",
+        "icon": "$(plug)"
       },
       {
         "command": "aiCallTree.uninstallHooks",
@@ -56,7 +57,8 @@
       {
         "command": "aiCallTree.clear",
         "title": "Clear Recorded Calls",
-        "category": "Call Tree"
+        "category": "Call Tree",
+        "icon": "$(clear-all)"
       }
     ],
     "chatParticipants": [
@@ -79,6 +81,25 @@
           "description": "How the rows draw at first: a tree of duration bars, or a waterfall on a time axis."
         }
       }
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "aiCallTree.clear",
+          "when": "view == aiCallTree.view",
+          "group": "navigation@1"
+        },
+        {
+          "command": "aiCallTree.installHooks",
+          "when": "view == aiCallTree.view",
+          "group": "9_hooks@1"
+        },
+        {
+          "command": "aiCallTree.uninstallHooks",
+          "when": "view == aiCallTree.view",
+          "group": "9_hooks@2"
+        }
+      ]
     }
   },
   "scripts": {

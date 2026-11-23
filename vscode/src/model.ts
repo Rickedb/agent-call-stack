@@ -81,7 +81,7 @@ export class Session {
   }
 
   private add(fields: Omit<Node, 'id'> & { id?: string }): Node {
-    const node: Node = { ...fields, id: fields.id ?? `n${++this.seq}` }
+    const node: Node = { ...fields, id: fields.id ?? `${this.id}#${++this.seq}` }
     this.nodes.push(node)
     this.byId.set(node.id, node)
     if (this.nodes.length > MAX_NODES) this.dropOldest()

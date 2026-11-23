@@ -19,6 +19,7 @@ const view = (over: Partial<View> = {}): View => ({
   shown: new Set(),
   now: t + 500,
   hooksInstalled: true,
+  hasWorkspace: true,
   sessions: [],
   picked: '',
   ...over,
@@ -31,10 +32,28 @@ const basic = () =>
     ev({ kind: 'tool_post', tool: 'Bash', toolUseId: 'u1', output: 'file one\nfile two' }),
   )
 
-test('an empty session says so, and offers the hooks when they are missing', () => {
-  assert.match(renderBody(undefined, view()), /No calls yet/)
-  assert.doesNotMatch(renderBody(undefined, view()), /Install hooks/)
-  assert.match(renderBody(undefined, view({ hooksInstalled: false })), /data-act="install"/)
+test('before the hooks are installed the panel says so and offers the buttons', () => {
+  const html = renderBody(undefined, view({ hooksInstalled: false }))
+  assert.match(html, /Call Tree is not set up yet/)
+  assert.match(html, /data-act="installUser"[^>]*>Install for all workspaces</)
+  assert.match(html, /data-act="installWorkspace"[^>]*>This workspace only</)
+  // And where to look if it still does not work.
+  assert.match(html, /data-act="openSettings"/)
+  assert.match(html, /node<\/code> on your PATH/)
+})
+
+test('with no folder open there is no workspace button', () => {
+  const html = renderBody(undefined, view({ hooksInstalled: false, hasWorkspace: false }))
+  assert.match(html, /data-act="installUser"/)
+  assert.doesNotMatch(html, /data-act="installWorkspace"/)
+})
+
+test('once installed, an empty session says what to do and offers no install', () => {
+  const html = renderBody(undefined, view())
+  assert.match(html, /No calls yet/)
+  assert.match(html, /Send a prompt to Copilot in agent mode/)
+  assert.doesNotMatch(html, /data-act="install/)
+  assert.match(html, /data-act="openSettings"/)
 })
 
 test('the waterfall lists each call with its start; the tree has no start offsets', () => {
@@ -164,4 +183,93 @@ test('the text tree shows output tokens too', () => {
     ev({ kind: 'tool_post', tool: 'Bash', toolUseId: 'u', output: 'x'.repeat(40), outputLen: 40 }),
   )
   assert.match(renderText(s, t + 1000), /Bash.*~10 tok/)
+})
+
+test('the newest prompt is on top, numbered by when it came', () => {
+  const s = session(
+    ev({ kind: 'prompt', arg: 'first ask' }),
+    ev({ kind: 'prompt', arg: 'second ask' }),
+    ev({ kind: 'prompt', arg: 'third ask' }),
+  )
+  const html = renderBody(s, view())
+  const at = (text: string) => html.indexOf(text)
+  assert.ok(at('third ask') < at('second ask') && at('second ask') < at('first ask'))
+  assert.ok(at('Prompt 3') < at('Prompt 2') && at('Prompt 2') < at('Prompt 1'))
+})
+
+test('a folded prompt hides its calls and its time axis; the open one keeps them', () => {
+  const s = session(
+    ev({ kind: 'prompt', arg: 'old ask' }),
+    ev({ kind: 'tool_pre', tool: 'OldTool', toolUseId: 'a' }),
+    ev({ kind: 'tool_post', tool: 'OldTool', toolUseId: 'a', output: 'x' }),
+    ev({ kind: 'prompt', arg: 'new ask' }),
+    ev({ kind: 'tool_pre', tool: 'NewTool', toolUseId: 'b' }),
+  )
+  const old = s.nodes.find(n => n.arg === 'old ask')
+  const html = renderBody(s, view({ folded: new Set([old?.id ?? '']) }))
+  assert.doesNotMatch(html, /OldTool/)
+  assert.match(html, /NewTool/)
+  // The old prompt says how many calls it holds; only the open one draws an axis.
+  assert.match(html, /\+1/)
+  assert.equal(html.match(/class="axis dim"/g)?.length, 1)
+})
+
+// A prompt with an agent, a tool before it, and two calls inside it that overlap.
+const nested = () =>
+  session(
+    ev({ kind: 'prompt', arg: 'work' }),
+    ev({ kind: 'tool_pre', tool: 'Before', toolUseId: 'b' }),
+    ev({ kind: 'tool_post', tool: 'Before', toolUseId: 'b', output: 'x' }),
+    ev({ kind: 'agent_start', agentId: 'ag', agentType: 'Explore' }),
+    ev({ kind: 'tool_pre', tool: 'Grep', agentId: 'ag', toolUseId: 'g1', arg: 'one' }),
+    ev({ kind: 'tool_pre', tool: 'Read', agentId: 'ag', toolUseId: 'g2', arg: 'two' }),
+    ev({ kind: 'tool_post', tool: 'Grep', agentId: 'ag', toolUseId: 'g1', output: 'x' }),
+    ev({ kind: 'tool_post', tool: 'Read', agentId: 'ag', toolUseId: 'g2', output: 'x' }),
+    ev({ kind: 'agent_stop', agentId: 'ag', agentType: 'Explore' }),
+  )
+
+test('calls at the same time are marked, in the tree and in the waterfall', () => {
+  for (const mode of ['tree', 'waterfall'] as const) {
+    const html = renderBody(nested(), view({ mode }))
+    // Grep and Read overlap: each says so, and its branch is drawn in the parallel color.
+    assert.equal(html.match(/class="par-tag"/g)?.length, 2)
+    assert.match(html, /parallel ×2/)
+    assert.equal(html.match(/class="lane [lt] par"/g)?.length, 2)
+  }
+})
+
+test('a call that ran alone has no parallel mark', () => {
+  const s = session(
+    ev({ kind: 'prompt', arg: 'p' }),
+    ev({ kind: 'tool_pre', tool: 'A', toolUseId: 'a' }),
+    ev({ kind: 'tool_post', tool: 'A', toolUseId: 'a', output: 'x' }),
+    ev({ kind: 'tool_pre', tool: 'B', toolUseId: 'b' }),
+    ev({ kind: 'tool_post', tool: 'B', toolUseId: 'b', output: 'x' }),
+  )
+  const html = renderBody(s, view())
+  assert.doesNotMatch(html, /par-tag/)
+  assert.doesNotMatch(html, /lane [lt] par/)
+})
+
+test('guide lines show the nesting: a line goes on past a branch that has more after it', () => {
+  const html = renderBody(nested(), view({ mode: 'tree' }))
+  // Before (not last, at depth 1) gets a tee; Explore (last) an elbow; and the calls
+  // inside Explore see no line from Explore, as it is the last of its level.
+  assert.match(html, /class="lane t"/)
+  assert.match(html, /class="lane l"/)
+  const s = nested()
+  const before = s.nodes.find(n => n.name === 'Before')
+  // The details name who a call ran with.
+  const grep = s.nodes.find(n => n.name === 'Grep')
+  const open = renderBody(s, view({ selected: grep?.id ?? '' }))
+  assert.match(open, /class="par-text">Ran at the same time as 1 other: Read two/)
+  assert.doesNotMatch(renderBody(s, view({ selected: before?.id ?? '' })), /class="par-text"/)
+})
+
+test('the text tree draws a parallel branch double', () => {
+  const text = renderText(nested(), t + 1000)
+  assert.match(text, /╞═ .*Grep.*∥ ×2/)
+  assert.match(text, /╘═ .*Read.*∥ ×2/)
+  assert.match(text, /├─ .*Before/)
+  assert.match(text, /└─ .*Explore/)
 })

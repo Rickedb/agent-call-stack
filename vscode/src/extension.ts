@@ -4,6 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import * as vscode from 'vscode'
 
+import { collapseOlder } from './collapse'
 import { hookFile, installHookFile, installRecorder, removeHookFile } from './hooks'
 import type { Session } from './model'
 import { foldableIds, isRunning, renderBody, renderText } from './render'
@@ -29,6 +30,8 @@ class CallTreeView implements vscode.WebviewViewProvider {
   private picked = ''
   private folded = new Set<string>()
   private shown = new Set<string>()
+  /** The prompts already seen, so that only a new one folds the rest. */
+  private seen = new Set<string>()
 
   constructor(
     private ctx: vscode.ExtensionContext,
@@ -37,7 +40,14 @@ class CallTreeView implements vscode.WebviewViewProvider {
     this.mode =
       ctx.globalState.get<'tree' | 'waterfall'>('mode') ??
       vscode.workspace.getConfiguration('aiCallTree').get<'tree' | 'waterfall'>('defaultView', 'waterfall')
-    ctx.subscriptions.push(store.onChange(() => this.render()))
+    // A new prompt folds the ones before it; what history there is, folds but the latest.
+    collapseOlder(store.model.sessions.values(), this.seen, this.folded)
+    ctx.subscriptions.push(
+      store.onChange(() => {
+        collapseOlder(store.model.sessions.values(), this.seen, this.folded)
+        this.render()
+      }),
+    )
   }
 
   /** The session drawn: the one picked, else the newest of this workspace. */
@@ -85,6 +95,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
       shown: this.shown,
       now: Date.now(),
       hooksInstalled: hooksInstalled(),
+      hasWorkspace: workspaceFolders().length > 0,
       sessions: list.map(s => ({ id: s.id, label: s.label })),
       picked: this.picked,
     })
@@ -125,6 +136,15 @@ class CallTreeView implements vscode.WebviewViewProvider {
       case 'install':
         await vscode.commands.executeCommand('aiCallTree.installHooks')
         break
+      case 'installUser':
+        await vscode.commands.executeCommand('aiCallTree.installHooks', 'user')
+        break
+      case 'installWorkspace':
+        await vscode.commands.executeCommand('aiCallTree.installHooks', 'workspace')
+        break
+      case 'openSettings':
+        await vscode.commands.executeCommand('workbench.action.openSettings', 'chat.useHooks')
+        break
       case 'copy':
       case 'copyPath': {
         if (!node || !m.which) break
@@ -159,27 +179,36 @@ export function activate(ctx: vscode.ExtensionContext): void {
     }
   }
 
-  const installHooks = async () => {
-    const folder = workspaceFolders()[0]
+  type Scope = 'user' | 'workspace'
+  const askScope = async (folder: string | undefined): Promise<Scope | undefined> => {
     const pick = await vscode.window.showQuickPick(
       [
-        {
-          label: 'All workspaces',
-          description: '~/.copilot/hooks',
-          scope: 'user' as const,
-        },
+        { label: 'All workspaces', description: '~/.copilot/hooks', scope: 'user' as Scope },
         ...(folder
           ? [
               {
                 label: 'This workspace',
                 description: '.github/hooks (holds an absolute path to your machine: do not commit it)',
-                scope: 'workspace' as const,
+                scope: 'workspace' as Scope,
               },
             ]
           : []),
       ],
       { title: 'Where should the call tree hooks be installed?' },
     )
+    return pick?.scope
+  }
+
+  // The panel's buttons say where; from the command palette or the view's menu nothing does, so it asks.
+  const installHooks = async (asked?: unknown) => {
+    const folder = workspaceFolders()[0]
+    const given: Scope | undefined = asked === 'user' || asked === 'workspace' ? asked : undefined
+    if (given === 'workspace' && !folder) {
+      void vscode.window.showErrorMessage('Call tree: open a folder to install the hooks for this workspace.')
+      return
+    }
+    const scope = given ?? (await askScope(folder))
+    const pick = scope ? { scope } : undefined
     if (!pick) return
     const file = hookFile(pick.scope, folder)
     if (!file) return
@@ -226,6 +255,21 @@ export function activate(ctx: vscode.ExtensionContext): void {
       store.clear(store.model.list(workspaceFolders()).map(s => s.id))
     }),
   )
+
+  // Not set up: say so once, with the button, rather than leave it to the command palette.
+  const PROMPTED = 'hooksPromptDismissed'
+  if (!hooksInstalled() && !ctx.globalState.get<boolean>(PROMPTED)) {
+    void vscode.window
+      .showInformationMessage(
+        'Call Tree needs the Copilot hooks installed to record what the agent does.',
+        'Install hooks',
+        "Don't ask again",
+      )
+      .then(answer => {
+        if (answer === 'Install hooks') void vscode.commands.executeCommand('aiCallTree.installHooks')
+        if (answer === "Don't ask again") void ctx.globalState.update(PROMPTED, true)
+      })
+  }
 
   // `@calltree` in the chat: the tree as text, the counterpart of the original's `/call-tree`.
   if (vscode.chat?.createChatParticipant) {

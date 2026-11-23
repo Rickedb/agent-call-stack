@@ -1,6 +1,7 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { Node } from '../../types'
+import type { Group } from './parallel'
 
 /** The element table of the surface being drawn: `Box`, `Text`, `Button`. */
 export type Els = ReturnType<EngineInterface['ui']['resolve']>
@@ -24,10 +25,27 @@ export type Pane = {
   below: (n: Node) => Node[]
   /** How long a node ran: what history recorded, else start to end (or now). */
   span: (n: Node) => number
-  /** The room left of a row, and the width of a bar. */
+  /** Calls that ran at the same time as others under their parent, by id. */
+  together: Map<string, Group>
+  /** The room left of a row's details. */
   gutter: number
+  /** The width of the bar column at a row's right end; 0 in the tree. */
   barW: number
   promptNo: Map<string, number>
+}
+
+/** One level above a row: does its branch go on below, and was it a parallel one. */
+export type Lane = { last: boolean; par: boolean }
+
+/** A row's place in the tree. */
+export type Place = {
+  node: Node
+  depth: number
+  hidden: number
+  /** For each level above it, from the prompt's children down. */
+  trail: Lane[]
+  /** Whether it is the last of its parent's children. */
+  isLast: boolean
 }
 
 /** What a prompt's section works out once for its rows. */
@@ -36,4 +54,7 @@ export type Section = {
   t1: number
   slowest: Node | undefined
   rowCount: number
+  /** The widest output-size and time cells of its rows, so the columns line up. */
+  tokW: number
+  timeW: number
 }

@@ -2,7 +2,7 @@ import type { On } from 'claude-code'
 
 import { clip, describe, summarize } from './format'
 import { guard, keep, patch, upsert } from './nodes'
-import { readRoot, setRoot, updateNodes } from './state'
+import { foldIds, readNodes, readRoot, setRoot, updateNodes } from './state'
 
 // What is seen of the work, as it happens: a prompt, a subagent, a tool call
 // and its result, each a row in the state.
@@ -22,6 +22,12 @@ export const recording = (on: On) => {
             start: Date.now(),
             ...text,
           }),
+        )
+        // A new prompt folds the ones before it; the person can open any again.
+        const before = (await readNodes($)).filter(n => n.kind === 'prompt' && n.id !== e.turnId)
+        await foldIds(
+          $,
+          before.map(n => n.id),
         )
       })
     }

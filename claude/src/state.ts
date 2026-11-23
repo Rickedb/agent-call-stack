@@ -99,6 +99,10 @@ export function toggleFolded($: EngineInterface, id: string) {
 export function setFolded($: EngineInterface, ids: string[]) {
   return update($, folded, () => ids)
 }
+// Folds more rows, leaving what is folded as it is.
+export function foldIds($: EngineInterface, ids: string[]) {
+  return update($, folded, list => [...list, ...ids.filter(id => !list.includes(id))])
+}
 
 // The texts shown whole, as `<id>:input` or `<id>:output`.
 export function readShown($: EngineInterface) {

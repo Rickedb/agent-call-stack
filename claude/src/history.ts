@@ -4,7 +4,7 @@ import type { Node } from '../types'
 import { HIST_KEEP, MAX_NODES } from './config'
 import { clip, describe, summarize, userText } from './format'
 import { keep } from './nodes'
-import { markFilled, readFilled, readNodes, updateNodes } from './state'
+import { foldIds, markFilled, readFilled, readNodes, updateNodes } from './state'
 
 // Reads the chat's history once into the nodes: every prompt before the first
 // one this mod saw live, with its tool calls and subagents. History has no
@@ -119,4 +119,8 @@ export async function backfill($: EngineInterface) {
   await updateNodes($, list =>
     [...out, ...list.filter(n => !out.some(o => o.id === n.id))].slice(-MAX_NODES),
   )
+  // What came before is folded, as every earlier prompt is: all of it when a
+  // live prompt follows, else all but the last, which is then the latest.
+  const past = out.filter(n => n.kind === 'prompt').map(n => n.id)
+  await foldIds($, firstLive ? past : past.slice(0, -1))
 }

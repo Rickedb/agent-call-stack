@@ -4,6 +4,7 @@ import type { Node } from '../../types'
 import { PANE } from '../config'
 import { readFolded, readMode, readNodes, readSelected, readShown } from '../state'
 import type { Pane as Draw } from './context'
+import { parallelGroups } from './parallel'
 import { section } from './section'
 import { summary, toolbar } from './toolbar'
 import { widget } from './widget'
@@ -36,22 +37,30 @@ export const pane = (on: On) => {
       }
       const below = (n: Node): Node[] => (kids.get(n.id) ?? []).flatMap(c => [c, ...below(c)])
 
+      // Calls under one parent that ran at the same time.
+      const together: Draw['together'] = new Map()
+      for (const sibs of kids.values()) for (const [id, g] of parallelGroups(sibs, now)) together.set(id, g)
+
       const gutter = 2
+      const isWaterfall = (await readMode($)) === 'waterfall'
       const c: Draw = {
         els,
         list,
         prompts,
         pick: await readSelected($),
-        isWaterfall: (await readMode($)) === 'waterfall',
+        isWaterfall,
         fold: new Set(await readFolded($)),
         whole: new Set(await readShown($)),
         cols,
         now,
         kids,
         below,
+        together,
         span: n => (n.hist ? (n.ms ?? 0) : (n.end ?? now) - n.start),
         gutter,
-        barW: Math.max(10, cols - gutter),
+        // The bar column: a quarter of the width, 8 to 32 cells. None in the tree. A narrow
+        // pane keeps it (the bar is the waterfall) and gives up other cells instead.
+        barW: isWaterfall ? Math.min(32, Math.max(8, Math.floor(cols / 4))) : 0,
         promptNo: new Map(prompts.map((n, i) => [n.id, i + 1])),
       }
 
@@ -61,9 +70,13 @@ export const pane = (on: On) => {
         <Box flexDirection="column" gap={1}>
           {toolbar($, c)}
           {summary(c)}
-          {prompts.map((top, i) => (
+          {[...prompts].reverse().map((top, i) => (
             <Box flexDirection="column" gap={1}>
-              {i > 0 ? <Text dimColor>{'─'.repeat(cols)}</Text> : null}
+              {i > 0 ? (
+                <Text dimColor wrap="truncate">
+                  {'─'.repeat(cols)}
+                </Text>
+              ) : null}
               {section($, c, top)}
             </Box>
           ))}
