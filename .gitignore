@@ -1,4 +1,5 @@
 .claude-plugin/types/
+claude/.claude-plugin/types/
 node_modules/
 *.tsbuildinfo
 *.log

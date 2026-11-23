@@ -1,6 +1,6 @@
 # ai-call-tree
 
-A Claude Code mod that adds a live "Call tree" pane beside the chat. It shows what Claude is doing as a tree, like a stack trace: each prompt, the subagents it started, and the tool calls inside them, with status and duration. Running calls are listed at the top as the current stack, innermost first.
+A live "Call tree" pane for coding agents. It shows what the agent is doing as a tree, like a stack trace: each prompt, the subagents it started, and the tool calls inside them, with status, duration and the size of each output in tokens. Running calls are listed at the top as the current stack, innermost first. The pane draws as a tree or a waterfall, and a row opens its input and output.
 
 ```
 Stack (innermost first)
@@ -14,24 +14,13 @@ Stack (innermost first)
 └─ 🔧 ✓ Edit(src/login.ts)                  0.1s
 ```
 
-## Tokens
+## One folder per agent
 
-Each row shows the size of its output in tokens (`~340 tok`), and a row's details show both the input and the output. These are estimates, at four characters a token, from the whole text. The engine gives no count per call, so every row is estimated alike. The Copilot port in `vscode/` does the same.
+| Agent | Folder | What it is |
+| --- | --- | --- |
+| Claude Code | [`claude/`](claude/README.md) | A Claude Code mod: hooks on the engine's events and a pane beside the chat. |
+| GitHub Copilot in VS Code | [`vscode/`](vscode/README.md) | A hook script that records the agent's events, and an extension that draws the same pane. |
 
-## Use
+The targets keep the same features; what differs is listed in [AGENTS.md](AGENTS.md), which is also the rule for changing any of them.
 
-The pane opens at session start. Run `/call-tree` to open it again.
-
-## GitHub Copilot / VS Code
-
-The [`vscode/`](vscode/README.md) folder is a port for GitHub Copilot in VS Code: a hook script that records the agent's events, and an extension that draws the same pane.
-
-## Develop
-
-Validate and type-check:
-
-```bash
-claude plugin validate .
-```
-
-Load it in a session with `claude --plugin-dir <this folder>`.
+The Claude Code marketplace manifest stays in `.claude-plugin/` at the root and points at `claude/`.

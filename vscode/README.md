@@ -1,6 +1,6 @@
 # AI Call Tree for GitHub Copilot (VS Code)
 
-The VS Code port of the [Claude Code mod](../README.md): a live "Call tree" pane that shows what Copilot's agent is doing as a tree, like a stack trace. Each prompt, the subagents it started, and the tool calls inside them, with status and duration, in a tree or a waterfall.
+The VS Code port of the [Claude Code mod](../claude/README.md): a live "Call tree" pane that shows what Copilot's agent is doing as a tree, like a stack trace. Each prompt, the subagents it started, and the tool calls inside them, with status and duration, in a tree or a waterfall.
 
 ```
 Stack (innermost first)
