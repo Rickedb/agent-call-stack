@@ -14,6 +14,10 @@ Stack (innermost first)
 └─ 🔧 ✓ Edit(src/login.ts)                  0.1s
 ```
 
+## Tokens
+
+Each row shows the size of its output in tokens (`~340 tok`), and a row's details show both the input and the output. These are estimates, at four characters a token, from the whole text. The engine gives no count per call, so every row is estimated alike. The Copilot port in `vscode/` does the same.
+
 ## Use
 
 The pane opens at session start. Run `/call-tree` to open it again.

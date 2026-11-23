@@ -2,7 +2,7 @@ import * as assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { Session } from '../model'
-import { renderBody, renderText, type View } from '../render'
+import { renderBody, renderText, tokText, type View } from '../render'
 import type { Ev } from '../types'
 
 let t = 1000
@@ -124,4 +124,44 @@ test('the stack lists what runs, innermost first, above the tree', () => {
   assert.ok(text.indexOf('Grep(auth)') < text.indexOf('Explore'))
   assert.match(text, /💬 ● Prompt 1/)
   assert.match(text, /└─ 🔧 ● Grep\(auth\)/)
+})
+
+test('each row shows its output tokens, estimated; details show input and output', () => {
+  const s = session(
+    ev({ kind: 'prompt', arg: 'p' }),
+    // "command: ls" is 11 characters, ~3 tokens; "file one\nfile two" is 17, ~5.
+    ev({ kind: 'tool_pre', tool: 'Bash', toolUseId: 'u', input: 'command: ls', inputLen: 11 }),
+    ev({ kind: 'tool_post', tool: 'Bash', toolUseId: 'u', output: 'file one\nfile two', outputLen: 17 }),
+    ev({ kind: 'tool_pre', tool: 'Read', toolUseId: 'r' }),
+  )
+  const call = s.nodes.find(n => n.name === 'Bash')
+  const running = s.nodes.find(n => n.name === 'Read')
+
+  for (const mode of ['tree', 'waterfall'] as const) {
+    const html = renderBody(s, view({ mode }))
+    assert.match(html, />~5 tok</)
+    // The call still running has no output yet, so no figure.
+    assert.equal(html.match(/class="dim tok"/g)?.length, 1)
+  }
+
+  const details = renderBody(s, view({ selected: call?.id ?? '' }))
+  assert.match(details, /input ~3 tok · output ~5 tok/)
+  assert.match(renderBody(s, view({ selected: running?.id ?? '' })), /input — · output —/)
+})
+
+test('the size comes from the whole text, not the cut one, and reads in k and M', () => {
+  const big = (n: number) => tokText({ id: 'x', kind: 'tool', name: 'x', arg: '', status: 'ok', start: 0, output: 'cut', outputLen: n }, 'output')
+  assert.equal(big(4), '~1 tok')
+  assert.equal(big(50_000), '~13k tok')
+  assert.equal(big(6_000), '~1.5k tok')
+  assert.equal(big(8_000_000), '~2.0M tok')
+})
+
+test('the text tree shows output tokens too', () => {
+  const s = session(
+    ev({ kind: 'prompt', arg: 'p' }),
+    ev({ kind: 'tool_pre', tool: 'Bash', toolUseId: 'u' }),
+    ev({ kind: 'tool_post', tool: 'Bash', toolUseId: 'u', output: 'x'.repeat(40), outputLen: 40 }),
+  )
+  assert.match(renderText(s, t + 1000), /Bash.*~10 tok/)
 })

@@ -36,9 +36,15 @@ test('the waterfall lists a call and a press opens its details', async ($, on) =
     // The tool row is a Button keyed by the call's id; find it by its words.
     const row = await ui.find({ type: 'Button', text: /Bash/ })
     expect(row).toBeDefined()
+
+    // The row shows the output's size: "file one\nfile two" is 17 characters, ~5 tokens.
+    expect(await ui.find({ type: 'Text', text: /^~5 tok/ })).toBeDefined()
+
     await ui.press({ key: row?.key ?? '' })
 
     expect(await ui.find({ type: 'Text', text: /file two/ })).toBeDefined()
+    // The details show both sizes: "command: ls" is 11 characters, ~3 tokens.
+    expect(await ui.find({ type: 'Text', text: /input ~3 tok · output ~5 tok/ })).toBeDefined()
 
     // The selection is the session's: close it so the next surface starts clean.
     await ui.press({ key: 'close' })

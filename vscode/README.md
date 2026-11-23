@@ -31,6 +31,10 @@ What maps to what:
 | `ui.open` pane, `/call-tree` | Panel view, `Call Tree: Open Call Tree`, and `@calltree` in chat (text tree) |
 | State atoms | Extension host state (view mode is remembered) |
 
+## Tokens
+
+Each row shows the size of its output in tokens (`~340 tok`, hover for what it means), and a row's details show both the input and the output. These are estimates, at four characters a token, from the whole text: Copilot's hooks give no token counts. The Claude Code mod shows the same figures, estimated the same way.
+
 ## Use
 
 1. Build and install the extension (see Develop).

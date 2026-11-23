@@ -77,6 +77,27 @@ const dur = (ms: number) => {
   return `${Math.floor(m / 60000)}m ${Math.round((m % 60000) / 1000)}s`
 }
 
+// A text's size in tokens. The engine gives no count per call (only per model
+// response), so every row is estimated alike, at four characters a token, and
+// drawn with a "~". The length is the whole text's, not the cut one the state keeps.
+const sizeOf = (n: Node, which: 'input' | 'output') =>
+  (which === 'input' ? n.inputLen ?? n.input?.length : n.outputLen ?? n.output?.length) ?? 0
+
+const fmtTokens = (n: number) =>
+  n < 1000
+    ? `${n}`
+    : n < 10_000
+      ? `${(n / 1000).toFixed(1)}k`
+      : n < 1_000_000
+        ? `${Math.round(n / 1000)}k`
+        : `${(n / 1_000_000).toFixed(1)}M`
+
+/** `~340 tok`, or `—` for a text there is none of (yet). */
+const tokText = (n: Node, which: 'input' | 'output') => {
+  const len = sizeOf(n, which)
+  return len > 0 ? `~${fmtTokens(Math.ceil(len / 4))} tok` : '—'
+}
+
 const upsert = (list: Node[], node: Node): Node[] => {
   const i = list.findIndex(n => n.id === node.id)
   const next =
@@ -568,6 +589,7 @@ export const register: Register = on => {
               {Math.min(100, Math.round((span(n) / t1) * 100))}% of prompt
             </Text>
           )}
+          <Text dimColor>{`input ${tokText(n, 'input')} · output ${tokText(n, 'output')}`}</Text>
         </Box>
         {block(n, 'input')}
         {block(n, 'output')}
@@ -624,7 +646,9 @@ export const register: Register = on => {
             : dur(ms)
         const lead = depth * 2 + 2
         const name = node.kind === 'prompt' ? `Prompt ${promptNo.get(node.id)}` : node.name
-        const room = cols - lead - right.length - 7 // kind icon + status mark
+        // The output's size beside the time; nothing until there is an output.
+        const out = sizeOf(node, 'output') > 0 ? tokText(node, 'output') : ''
+        const room = cols - lead - right.length - (out ? out.length + 2 : 0) - 7 // kind icon + status mark
         const arg = clip(node.arg, room - name.length - 1)
         return (
           <Box flexDirection="column">
@@ -662,6 +686,7 @@ export const register: Register = on => {
                   </Button>
                 </Box>
                 {node === slowest && rows.length > 3 ? <Text color="warning">slowest </Text> : null}
+                {out ? <Text dimColor>{`${out}  `}</Text> : null}
                 <Text dimColor>{right}</Text>
               </Box>
               {isWaterfall ? bar(node) : null}

@@ -35,6 +35,27 @@ export const dur = (ms: number): string => {
   return `${Math.floor(m / 60000)}m ${Math.round((m % 60000) / 1000)}s`
 }
 
+// A text's size in tokens. Copilot's hooks give no token counts, so every row is
+// estimated alike, at four characters a token, and drawn with a "~". The length
+// is the whole text's, not the cut one the log keeps.
+const sizeOf = (n: Node, which: 'input' | 'output') =>
+  (which === 'input' ? (n.inputLen ?? n.input?.length) : (n.outputLen ?? n.output?.length)) ?? 0
+
+export const fmtTokens = (n: number): string =>
+  n < 1000
+    ? `${n}`
+    : n < 10_000
+      ? `${(n / 1000).toFixed(1)}k`
+      : n < 1_000_000
+        ? `${Math.round(n / 1000)}k`
+        : `${(n / 1_000_000).toFixed(1)}M`
+
+/** `~340 tok`, or `—` for a text there is none of (yet). */
+export const tokText = (n: Node, which: 'input' | 'output'): string => {
+  const len = sizeOf(n, which)
+  return len > 0 ? `~${fmtTokens(Math.ceil(len / 4))} tok` : '—'
+}
+
 const KIND_ICON: Record<Node['kind'], string> = { prompt: '💬', agent: '🤖', tool: '🔧' }
 const icon = (n: Node) => KIND_ICON[n.kind]
 const mark = (n: Node) => (n.status === 'run' ? '●' : n.status === 'ok' ? '✓' : '✗')
@@ -128,6 +149,7 @@ export const renderBody = (s: Session | undefined, v: View): string => {
           100,
           Math.round((span(n, v.now) / t1) * 100),
         )}% of prompt</div>
+        <div class="dim">input ${tokText(n, 'input')} · output ${tokText(n, 'output')}</div>
       </div>
       ${block(n, 'input')}
       ${block(n, 'output')}
@@ -179,6 +201,11 @@ export const renderBody = (s: Session | undefined, v: View): string => {
             ${hidden ? `<span class="dim">+${hidden}</span>` : ''}
           </button>
           ${node === slowest && rows.length > 3 ? '<span class="warn">slowest</span>' : ''}
+          ${
+            sizeOf(node, 'output') > 0
+              ? `<span class="dim tok" title="Estimated output tokens (about 4 characters each)">${tokText(node, 'output')}</span>`
+              : ''
+          }
           <span class="dim time">${right}</span>
         </div>
         ${isWaterfall ? bar(node) : ''}
@@ -250,6 +277,7 @@ export const renderText = (s: Session | undefined, now: number): string => {
     const arg = n.arg && n.kind !== 'prompt' ? `(${clip(n.arg, 60)})` : n.kind === 'prompt' ? ` ${clip(n.arg, 60)}` : ''
     return `${icon(n)} ${mark(n)} ${name}${arg}`
   }
+  const size = (n: Node) => (sizeOf(n, 'output') > 0 ? `  ${tokText(n, 'output')}` : '')
 
   const out: string[] = []
   const live = below(top).filter(n => n.status === 'run')
@@ -259,12 +287,12 @@ export const renderText = (s: Session | undefined, now: number): string => {
     out.push('')
   }
 
-  out.push(`${line(top)}   ${dur(span(top, now))}`)
+  out.push(`${line(top)}   ${dur(span(top, now))}${size(top)}`)
   const walk = (n: Node, prefix: string) => {
     const children = kids.get(n.id) ?? []
     children.forEach((c, i) => {
       const last = i === children.length - 1
-      out.push(`${prefix}${last ? '└─' : '├─'} ${line(c)}   ${dur(span(c, now))}`)
+      out.push(`${prefix}${last ? '└─' : '├─'} ${line(c)}   ${dur(span(c, now))}${size(c)}`)
       walk(c, prefix + (last ? '   ' : '│  '))
     })
   }
