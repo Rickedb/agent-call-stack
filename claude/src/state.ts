@@ -10,33 +10,33 @@ import type { Node } from '../types'
 
 // Change a tag when the fields of what it holds change: it declines what an
 // earlier version stored, which outlives a reload.
-const nodes = atom({ plugin: 'ai-call-tree', key: 'nodes' } as const, [], {
+const nodes = atom({ plugin: 'ai-call-stack', key: 'nodes' } as const, [], {
   shape: 'nodes-5',
 })
-const root = atom({ plugin: 'ai-call-tree', key: 'root' } as const, '', {
+const root = atom({ plugin: 'ai-call-stack', key: 'root' } as const, '', {
   shape: 'root-1',
 })
-const mode = atom({ plugin: 'ai-call-tree', key: 'mode' } as const, 'waterfall', {
+const mode = atom({ plugin: 'ai-call-stack', key: 'mode' } as const, 'waterfall', {
   shape: 'mode-2',
 })
-const isClosed = atom({ plugin: 'ai-call-tree', key: 'isClosed' } as const, false, {
+const isClosed = atom({ plugin: 'ai-call-stack', key: 'isClosed' } as const, false, {
   shape: 'isClosed-1',
 })
-const filled = atom({ plugin: 'ai-call-tree', key: 'filled' } as const, false, {
+const filled = atom({ plugin: 'ai-call-stack', key: 'filled' } as const, false, {
   shape: 'filled-1',
 })
-const selected = atom({ plugin: 'ai-call-tree', key: 'selected' } as const, '', {
+const selected = atom({ plugin: 'ai-call-stack', key: 'selected' } as const, '', {
   shape: 'selected-1',
 })
-const folded = atom({ plugin: 'ai-call-tree', key: 'folded' } as const, [], {
+const folded = atom({ plugin: 'ai-call-stack', key: 'folded' } as const, [], {
   shape: 'folded-1',
 })
-const shown = atom({ plugin: 'ai-call-tree', key: 'shown' } as const, [], {
+const shown = atom({ plugin: 'ai-call-stack', key: 'shown' } as const, [], {
   shape: 'shown-1',
 })
 
 // The prompts whose summary is collapsed to its header.
-const shut = atom({ plugin: 'ai-call-tree', key: 'shut' } as const, [], {
+const shut = atom({ plugin: 'ai-call-stack', key: 'shut' } as const, [], {
   shape: 'shut-1',
 })
 

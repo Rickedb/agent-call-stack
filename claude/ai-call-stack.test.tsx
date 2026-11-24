@@ -6,9 +6,9 @@ import { touchOf } from './src/touch'
 import { commonDir, touchedOf } from './src/touched'
 
 const PANE = {
-  plugin: 'ai-call-tree',
+  plugin: 'ai-call-stack',
   component: 'Pane',
-  requestId: 'ai-call-tree',
+  requestId: 'ai-call-stack',
   props: {
     title: 'Call tree',
     isFocused: false,
@@ -148,7 +148,7 @@ test('a long result is cut in the state and kept whole in a file', async ($, on)
 
   const paths = Object.keys(written)
   expect(paths.length).toBe(1)
-  expect(paths[0]).toMatch(/^\/home\/test\/\.claude\/ai-call-tree\/.*\.output\.txt$/)
+  expect(paths[0]).toMatch(/^\/home\/test\/\.claude\/ai-call-stack\/.*\.output\.txt$/)
   expect(written[paths[0] ?? '']?.length).toBe(50000)
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
@@ -326,7 +326,7 @@ test('a closed pane leaves a button to open it again', async ($, on) => {
   })
 
   const band = {
-    plugin: 'ai-call-tree',
+    plugin: 'ai-call-stack',
     component: 'AbovePrompt',
     requestId: 'band',
     props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 4, scroll: { offset: 0, bodyRows: 4 }, view: {} },

@@ -1,11 +1,11 @@
 {
-  "name": "ai-call-tree-local",
+  "name": "ai-call-stack-local",
   "owner": {
     "name": "local"
   },
   "plugins": [
     {
-      "name": "ai-call-tree",
+      "name": "ai-call-stack",
       "source": "./claude"
     }
   ]

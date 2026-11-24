@@ -1,4 +1,4 @@
-# AI Call Tree for GitHub Copilot (VS Code)
+# AI Call Stack for GitHub Copilot (VS Code)
 
 The VS Code port of the [Claude Code mod](../claude/README.md): a live "Call tree" pane that shows what Copilot's agent is doing as a tree, like a stack trace. Each prompt, the subagents it started, and the tool calls inside them, with status and duration, in a tree or a waterfall.
 
@@ -18,7 +18,7 @@ Stack (innermost first)
 
 Copilot has no in-process plugin API like Claude Code's mods, so the port has two parts:
 
-1. **A hook script** (`src/record.ts`, installed as `~/.copilot/ai-call-tree/record.cjs`). Copilot [agent hooks](https://code.visualstudio.com/docs/copilot/customization/hooks) run it on each event (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `SubagentStart`, ...). It appends one normalized line to `~/.copilot/ai-call-tree/events/<session>.jsonl`. It never blocks or denies anything, prints `{}`, and swallows its own errors. Texts over 8,000 characters are cut in the log and kept whole in `blobs/`.
+1. **A hook script** (`src/record.ts`, installed as `~/.copilot/ai-call-stack/record.cjs`). Copilot [agent hooks](https://code.visualstudio.com/docs/copilot/customization/hooks) run it on each event (`UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `SubagentStart`, ...). It appends one normalized line to `~/.copilot/ai-call-stack/events/<session>.jsonl`. It never blocks or denies anything, prints `{}`, and swallows its own errors. Texts over 8,000 characters are cut in the log and kept whole in `blobs/`.
 2. **A VS Code extension** (`src/extension.ts`) that tails those logs and draws the pane in the side bar (the Activity Bar's **Call Tree** icon), with the same Tree / Waterfall views, folding, details, "Show all" and copy buttons.
 
 What maps to what:
@@ -86,7 +86,7 @@ The summary collapses to its header with a click on `▾ Summary` (`▸` when co
 ## Use
 
 1. Build and install the extension (see Develop).
-2. Open the **Call Tree** view (its icon in the Activity Bar, on the side, not in the bottom panel with Terminal). Until the hooks are installed it says so, with buttons: **Install for all workspaces** (`~/.copilot/hooks/ai-call-tree.json`) or **This workspace only** (`.github/hooks/ai-call-tree.json`). Pick one: both would record every call twice. The workspace file holds an absolute path to your machine, so do not commit it. A notification offers the same on first start, and the view's `…` menu and **Call Tree: Install Copilot Hooks** do too.
+2. Open the **Call Tree** view (its icon in the Activity Bar, on the side, not in the bottom panel with Terminal). Until the hooks are installed it says so, with buttons: **Install for all workspaces** (`~/.copilot/hooks/ai-call-stack.json`) or **This workspace only** (`.github/hooks/ai-call-stack.json`). Pick one: both would record every call twice. The workspace file holds an absolute path to your machine, so do not commit it. A notification offers the same on first start, and the view's `…` menu and **Call Tree: Install Copilot Hooks** do too.
 3. Start a new Copilot agent chat. The calls show up in the view (or open it with **Call Tree: Open Call Tree**).
 
 The view sits in the Activity Bar by default. To put it beside Copilot Chat, drag its icon to the Secondary Side Bar: VS Code remembers where you put it.
@@ -95,7 +95,7 @@ The newest prompt is on top. When a prompt starts, the ones before it fold away 
 
 Requirements: VS Code 1.95+, `node` on your `PATH` (hooks are run as `node record.cjs <Event>`), and agent hooks enabled in VS Code. Agent hooks are a preview feature; if nothing shows up, check the `chat.useHooks` setting and that hooks are not disabled by your organization.
 
-Other commands: **Remove Copilot Hooks**, **Clear Recorded Calls**. Setting `aiCallTree.defaultView` picks Tree or Waterfall at first.
+Other commands: **Remove Copilot Hooks**, **Clear Recorded Calls**. Setting `aiCallStack.defaultView` picks Tree or Waterfall at first.
 
 ## Differences from the Claude Code mod
 

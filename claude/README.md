@@ -1,6 +1,6 @@
-# ai-call-tree for Claude Code
+# ai-call-stack for Claude Code
 
-The Claude Code target of [ai-call-tree](../README.md). A Claude Code mod that adds a live "Call tree" pane beside the chat. It shows what Claude is doing as a tree, like a stack trace: each prompt, the subagents it started, and the tool calls inside them, with status and duration. Running calls are listed at the top as the current stack, innermost first.
+The Claude Code target of [ai-call-stack](../README.md). A Claude Code mod that adds a live "Call tree" pane beside the chat. It shows what Claude is doing as a tree, like a stack trace: each prompt, the subagents it started, and the tool calls inside them, with status and duration. Running calls are listed at the top as the current stack, innermost first.
 
 ```
 Stack (innermost first)
@@ -118,7 +118,7 @@ Validate and type-check:
 
 ```bash
 claude plugin validate .   # checks the manifest and reads the hooks module as the engine will
-claude plugin test .       # runs ai-call-tree.test.tsx
+claude plugin test .       # runs ai-call-stack.test.tsx
 ```
 
 Run it from this folder (`claude/`). Load it in a session with `claude --plugin-dir <this folder>`.
@@ -126,5 +126,5 @@ Run it from this folder (`claude/`). Load it in a session with `claude --plugin-
 Install from the marketplace at the repo root:
 
 ```
-/plugin install ai-call-tree --marketplace Rickedb/ai-call-tree
+/plugin install ai-call-stack --marketplace Rickedb/ai-call-stack
 ```

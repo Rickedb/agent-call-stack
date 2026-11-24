@@ -115,7 +115,7 @@ test('the script appends one line per event and prints nothing, so the work goes
   const run = (event: string, payload: object | string) =>
     spawnSync(process.execPath, [script, event], {
       input: typeof payload === 'string' ? payload : JSON.stringify(payload),
-      env: { ...process.env, AI_CALL_TREE_CLAUDE_DIR: dir },
+      env: { ...process.env, AI_CALL_STACK_CLAUDE_DIR: dir },
       encoding: 'utf8',
     })
   const a = run('UserPromptSubmit', { ...base, prompt: 'hi' })

@@ -1,5 +1,5 @@
 {
-  "name": "ai-call-tree",
+  "name": "ai-call-stack",
   "version": "0.1.1",
   "description": "A live pane showing Claude's calling tree like a stack trace: prompt, subagents, tool calls.",
   "types": "./types/index.d.ts"

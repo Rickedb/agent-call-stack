@@ -1,4 +1,4 @@
-# AI Call Tree for Claude Code (VS Code)
+# AI Call Stack for Claude Code (VS Code)
 
 A live "Call tree" pane for [Claude Code's VS Code extension](https://code.claude.com/docs/en/vs-code), as an extension of its own (it is not the [Copilot one](../vscode/README.md), and it does not need the [Claude Code mod](../claude/README.md)). It shows what Claude is doing as a tree, like a stack trace: each prompt, the subagents it started, and the tool calls inside them, with status, duration, the model, the tokens the API counted, what you were asked, errors and compactions, in a tree, a waterfall, or a view of what each prompt touched.
 
@@ -14,7 +14,7 @@ A live "Call tree" pane for [Claude Code's VS Code extension](https://code.claud
 
 Claude Code runs the hooks of its settings wherever it runs, the VS Code extension included, so the port has two parts, as the Copilot one has:
 
-1. **A hook script** (`src/record.ts`, installed as `~/.claude/ai-call-tree-vscode/record.cjs`). Claude Code runs it on each event. It appends one normalized line to `~/.claude/ai-call-tree-vscode/events/<session>.jsonl`, prints nothing (for a hook, "no decision": it never blocks or denies anything) and swallows its own errors. Texts over 8,000 characters are cut in the log and kept whole in `blobs/`.
+1. **A hook script** (`src/record.ts`, installed as `~/.claude/ai-call-stack-vscode/record.cjs`). Claude Code runs it on each event. It appends one normalized line to `~/.claude/ai-call-stack-vscode/events/<session>.jsonl`, prints nothing (for a hook, "no decision": it never blocks or denies anything) and swallows its own errors. Texts over 8,000 characters are cut in the log and kept whole in `blobs/`.
 2. **A VS Code extension** (`src/extension.ts`) that tails those logs, reads the model and token counts from Claude Code's transcript, and draws the pane in the side bar (the Activity Bar's **Claude Call Tree** icon).
 
 What maps to what:
@@ -32,10 +32,10 @@ What maps to what:
 ## Use
 
 1. Build and install the extension (see Develop).
-2. Open the **Claude Call Tree** view (its icon in the Activity Bar). Until the hooks are in your Claude Code settings it says so, with buttons: **Add to your settings** (`~/.claude/settings.json`) or **This workspace only** (`.claude/settings.local.json`, which Claude Code keeps out of git: the entries hold a path on your machine). Pick one: both would record every call twice. Adding keeps a copy of the file the first time (`settings.json.ai-call-tree.bak`), changes nothing but the hooks, and refuses a file that is not JSON. **Remove Hooks from Claude Code Settings** takes out only its own entries. A notification offers the same on first start.
+2. Open the **Claude Call Tree** view (its icon in the Activity Bar). Until the hooks are in your Claude Code settings it says so, with buttons: **Add to your settings** (`~/.claude/settings.json`) or **This workspace only** (`.claude/settings.local.json`, which Claude Code keeps out of git: the entries hold a path on your machine). Pick one: both would record every call twice. Adding keeps a copy of the file the first time (`settings.json.ai-call-stack.bak`), changes nothing but the hooks, and refuses a file that is not JSON. **Remove Hooks from Claude Code Settings** takes out only its own entries. A notification offers the same on first start.
 3. Send a prompt to Claude Code. A session that was already open when the hooks were added picks them up when it starts again.
 
-Requirements: VS Code 1.95+, `node` on your `PATH` (hooks run as `node record.cjs <Event>`), and settings that do not turn hooks off (`disableAllHooks`; the view says so when they do). Other commands: **Clear Recorded Calls**. Setting `aiCallTreeClaude.defaultView` picks Tree, Waterfall or Touched at first.
+Requirements: VS Code 1.95+, `node` on your `PATH` (hooks run as `node record.cjs <Event>`), and settings that do not turn hooks off (`disableAllHooks`; the view says so when they do). Other commands: **Clear Recorded Calls**. Setting `aiCallStackClaude.defaultView` picks Tree, Waterfall or Touched at first.
 
 The newest prompt is on top. When a prompt starts, the ones before it fold away (open any again with its arrow, or use *fold all* / *unfold all*).
 
@@ -117,4 +117,4 @@ npm run build
 npx @vscode/vsce package   # makes a .vsix to install with "Install from VSIX..."
 ```
 
-To run it from source, open the `claude-vscode/` folder in VS Code and press F5 (Extension Development Host), then add the hooks in that window. The recorder takes `AI_CALL_TREE_CLAUDE_DIR` for its folder, which tests use (the installer only recognizes its entries when the recorder sits in a folder named `ai-call-tree-vscode`).
+To run it from source, open the `claude-vscode/` folder in VS Code and press F5 (Extension Development Host), then add the hooks in that window. The recorder takes `AI_CALL_STACK_CLAUDE_DIR` for its folder, which tests use (the installer only recognizes its entries when the recorder sits in a folder named `ai-call-stack-vscode`).

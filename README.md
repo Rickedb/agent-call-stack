@@ -1,4 +1,4 @@
-# ai-call-tree
+# ai-call-stack
 
 A live "Call tree" pane for coding agents. It shows what the agent is doing as a tree, like a stack trace: each prompt, the subagents it started, and the tool calls inside them, with status, duration and the size of each output in tokens. Running calls are listed at the top as the current stack, innermost first. The pane draws as a tree or a waterfall, and a row opens its input and output.
 

@@ -1,4 +1,4 @@
-export const PANE = 'ai-call-tree'
+export const PANE = 'ai-call-stack'
 export const MAX_NODES = 300
 // What the state keeps of one text. Longer text goes whole to a file.
 export const KEEP = 8000

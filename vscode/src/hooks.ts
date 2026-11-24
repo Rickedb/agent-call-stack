@@ -17,7 +17,7 @@ export const EVENTS = [
   'ErrorOccurred',
 ] as const
 
-export const HOOK_FILE = 'ai-call-tree.json'
+export const HOOK_FILE = 'ai-call-stack.json'
 
 /** The hook config for a recorder script: one command per event. */
 export const buildHookConfig = (script: string) => {

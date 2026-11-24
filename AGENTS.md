@@ -34,7 +34,7 @@ What is recorded, folded, counted (tokens) and summed up (a finished prompt's su
 
 1. What does the change add or alter, in terms a person sees?
 2. Does each target do it? If not, do it, or write the exception.
-3. Tests: each target tests it in its own way (`claude/` has `ai-call-tree.test.tsx`, `vscode/` has `npm test`).
+3. Tests: each target tests it in its own way (`claude/` has `ai-call-stack.test.tsx`, `vscode/` has `npm test`).
 4. READMEs and this file are up to date.
 
 ## Known exceptions

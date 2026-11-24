@@ -62,7 +62,7 @@ export async function keep(
   try {
     const home = await $.env.get('HOME')
     if (home) {
-      const path = `${home}/.claude/ai-call-tree/${id.replace(/[^\w.-]/g, '_')}.${which}.txt`
+      const path = `${home}/.claude/ai-call-stack/${id.replace(/[^\w.-]/g, '_')}.${which}.txt`
       await $.fs.write(path, text.slice(0, FILE_MAX))
       fields[`${which}File`] = path
     }

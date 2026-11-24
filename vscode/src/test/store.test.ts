@@ -67,12 +67,12 @@ test('clearing deletes the logs of the sessions given', () => {
 })
 
 test('the hook config has one command per event, with paths safe for any shell', () => {
-  const config = buildHookConfig('C:\\Users\\me\\.copilot\\ai-call-tree\\record.cjs')
+  const config = buildHookConfig('C:\\Users\\me\\.copilot\\ai-call-stack\\record.cjs')
   assert.equal(config.version, 1)
   assert.deepEqual(Object.keys(config.hooks), [...EVENTS])
   const entry = config.hooks.PreToolUse?.[0]
   assert.equal(entry?.type, 'command')
-  assert.equal(entry?.command, 'node "C:/Users/me/.copilot/ai-call-tree/record.cjs" PreToolUse')
+  assert.equal(entry?.command, 'node "C:/Users/me/.copilot/ai-call-stack/record.cjs" PreToolUse')
   assert.equal(entry?.timeoutSec, 5)
 })
 
@@ -84,7 +84,7 @@ test('the installer copies the recorder and writes and removes the hook file', (
   assert.equal(fs.readFileSync(recorder, 'utf8'), '// recorder')
 
   const file = hookFile('workspace', dir) as string
-  assert.equal(file, path.join(dir, '.github', 'hooks', 'ai-call-tree.json'))
+  assert.equal(file, path.join(dir, '.github', 'hooks', 'ai-call-stack.json'))
   installHookFile(file, recorder)
   const written = JSON.parse(fs.readFileSync(file, 'utf8')) as ReturnType<typeof buildHookConfig>
   assert.match(written.hooks.Stop?.[0]?.command ?? '', /record\.cjs" Stop$/)

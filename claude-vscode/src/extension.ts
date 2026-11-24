@@ -20,7 +20,7 @@ import { foldableIds, isRunning, renderBody, summaryMarkdown } from './render'
 import { EventStore } from './store'
 import { TranscriptReader } from './transcript'
 
-const VIEW = 'aiCallTreeClaude.view'
+const VIEW = 'aiCallStackClaude.view'
 
 const workspaceFolders = () => (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath)
 
@@ -53,7 +53,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
   ) {
     this.mode =
       ctx.globalState.get<'tree' | 'waterfall' | 'files'>('mode') ??
-      vscode.workspace.getConfiguration('aiCallTreeClaude').get<'tree' | 'waterfall' | 'files'>('defaultView', 'waterfall')
+      vscode.workspace.getConfiguration('aiCallStackClaude').get<'tree' | 'waterfall' | 'files'>('defaultView', 'waterfall')
     // A new prompt folds the ones before it; what history there is, folds but the latest.
     collapseOlder(store.model.sessions.values(), this.seen, this.folded)
     ctx.subscriptions.push(
@@ -162,13 +162,13 @@ class CallTreeView implements vscode.WebviewViewProvider {
         this.selected = ''
         break
       case 'install':
-        await vscode.commands.executeCommand('aiCallTreeClaude.installHooks')
+        await vscode.commands.executeCommand('aiCallStackClaude.installHooks')
         break
       case 'installUser':
-        await vscode.commands.executeCommand('aiCallTreeClaude.installHooks', 'user')
+        await vscode.commands.executeCommand('aiCallStackClaude.installHooks', 'user')
         break
       case 'installWorkspace':
-        await vscode.commands.executeCommand('aiCallTreeClaude.installHooks', 'workspace')
+        await vscode.commands.executeCommand('aiCallStackClaude.installHooks', 'workspace')
         break
       case 'openSettings':
         {
@@ -299,10 +299,10 @@ export function activate(ctx: vscode.ExtensionContext): void {
     vscode.window.registerWebviewViewProvider(VIEW, provider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
-    vscode.commands.registerCommand('aiCallTreeClaude.open', () => vscode.commands.executeCommand(`${VIEW}.focus`)),
-    vscode.commands.registerCommand('aiCallTreeClaude.installHooks', installHooks),
-    vscode.commands.registerCommand('aiCallTreeClaude.uninstallHooks', uninstallHooks),
-    vscode.commands.registerCommand('aiCallTreeClaude.clear', () => {
+    vscode.commands.registerCommand('aiCallStackClaude.open', () => vscode.commands.executeCommand(`${VIEW}.focus`)),
+    vscode.commands.registerCommand('aiCallStackClaude.installHooks', installHooks),
+    vscode.commands.registerCommand('aiCallStackClaude.uninstallHooks', uninstallHooks),
+    vscode.commands.registerCommand('aiCallStackClaude.clear', () => {
       store.clear(store.model.list(workspaceFolders()).map(s => s.id))
     }),
   )
@@ -317,7 +317,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
         "Don't ask again",
       )
       .then(answer => {
-        if (answer === 'Install hooks') void vscode.commands.executeCommand('aiCallTreeClaude.installHooks')
+        if (answer === 'Install hooks') void vscode.commands.executeCommand('aiCallStackClaude.installHooks')
         if (answer === "Don't ask again") void ctx.globalState.update(PROMPTED, true)
       })
   }

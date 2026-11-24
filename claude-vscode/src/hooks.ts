@@ -21,7 +21,7 @@ export const EVENTS = [
 ] as const
 
 /** The folder the recorder lives in; a hook whose command names it is ours. */
-export const MARK = 'ai-call-tree-vscode'
+export const MARK = 'ai-call-stack-vscode'
 
 export const claudeHome = (): string => process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
 
@@ -55,7 +55,7 @@ type Entry = { matcher?: unknown; hooks?: unknown }
 
 const isRec = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const isOurs = (h: unknown): boolean =>
-  isRec(h) && typeof h.command === 'string' && /ai-call-tree-vscode[\\/]record\.cjs/.test(h.command)
+  isRec(h) && typeof h.command === 'string' && /ai-call-stack-vscode[\\/]record\.cjs/.test(h.command)
 
 /** The command a hook runs: the recorder, told which event it is. Forward slashes work in bash, PowerShell and cmd alike. */
 export const commandFor = (recorder: string, event: string): string =>
@@ -126,9 +126,9 @@ export const readSettings = (file: string): Settings => {
 const write = (file: string, settings: Settings): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true })
   // The first time a file that was there is touched, keep what it was.
-  const backup = `${file}.ai-call-tree.bak`
+  const backup = `${file}.ai-call-stack.bak`
   if (fs.existsSync(file) && !fs.existsSync(backup)) fs.copyFileSync(file, backup)
-  const tmp = `${file}.ai-call-tree.tmp`
+  const tmp = `${file}.ai-call-stack.tmp`
   fs.writeFileSync(tmp, JSON.stringify(settings, null, 2) + '\n')
   fs.renameSync(tmp, file)
 }

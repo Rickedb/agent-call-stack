@@ -1,6 +1,6 @@
 {
-  "name": "ai-call-tree-claude",
-  "displayName": "AI Call Tree for Claude Code",
+  "name": "ai-call-stack-claude",
+  "displayName": "AI Call Stack for Claude Code",
   "description": "A live pane showing what Claude Code is doing as a call tree: prompt, subagents, tool calls, with status, duration, tokens, models, approvals, errors and compactions.",
   "version": "0.1.0",
   "publisher": "local",
@@ -22,49 +22,49 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "aiCallTreeClaude",
+          "id": "aiCallStackClaude",
           "title": "Claude Call Tree",
           "icon": "media/icon.svg"
         }
       ]
     },
     "views": {
-      "aiCallTreeClaude": [
+      "aiCallStackClaude": [
         {
           "type": "webview",
-          "id": "aiCallTreeClaude.view",
+          "id": "aiCallStackClaude.view",
           "name": "Call Tree"
         }
       ]
     },
     "commands": [
       {
-        "command": "aiCallTreeClaude.open",
+        "command": "aiCallStackClaude.open",
         "title": "Open Call Tree",
         "category": "Claude Call Tree"
       },
       {
-        "command": "aiCallTreeClaude.installHooks",
+        "command": "aiCallStackClaude.installHooks",
         "title": "Add Hooks to Claude Code Settings",
         "category": "Claude Call Tree",
         "icon": "$(plug)"
       },
       {
-        "command": "aiCallTreeClaude.uninstallHooks",
+        "command": "aiCallStackClaude.uninstallHooks",
         "title": "Remove Hooks from Claude Code Settings",
         "category": "Claude Call Tree"
       },
       {
-        "command": "aiCallTreeClaude.clear",
+        "command": "aiCallStackClaude.clear",
         "title": "Clear Recorded Calls",
         "category": "Claude Call Tree",
         "icon": "$(clear-all)"
       }
     ],
     "configuration": {
-      "title": "AI Call Tree for Claude Code",
+      "title": "AI Call Stack for Claude Code",
       "properties": {
-        "aiCallTreeClaude.defaultView": {
+        "aiCallStackClaude.defaultView": {
           "type": "string",
           "enum": [
             "tree",
@@ -79,18 +79,18 @@
     "menus": {
       "view/title": [
         {
-          "command": "aiCallTreeClaude.clear",
-          "when": "view == aiCallTreeClaude.view",
+          "command": "aiCallStackClaude.clear",
+          "when": "view == aiCallStackClaude.view",
           "group": "navigation@1"
         },
         {
-          "command": "aiCallTreeClaude.installHooks",
-          "when": "view == aiCallTreeClaude.view",
+          "command": "aiCallStackClaude.installHooks",
+          "when": "view == aiCallStackClaude.view",
           "group": "9_hooks@1"
         },
         {
-          "command": "aiCallTreeClaude.uninstallHooks",
-          "when": "view == aiCallTreeClaude.view",
+          "command": "aiCallStackClaude.uninstallHooks",
+          "when": "view == aiCallStackClaude.view",
           "group": "9_hooks@2"
         }
       ]

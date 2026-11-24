@@ -1,6 +1,6 @@
 {
-  "name": "ai-call-tree-copilot",
-  "displayName": "AI Call Tree for Copilot",
+  "name": "ai-call-stack-copilot",
+  "displayName": "AI Call Stack for Copilot",
   "description": "A live pane showing what GitHub Copilot's agent is doing as a call tree: prompt, subagents, tool calls, with status and duration.",
   "version": "0.1.0",
   "publisher": "local",
@@ -22,40 +22,40 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "aiCallTree",
+          "id": "aiCallStack",
           "title": "Call Tree",
           "icon": "media/icon.svg"
         }
       ]
     },
     "views": {
-      "aiCallTree": [
+      "aiCallStack": [
         {
           "type": "webview",
-          "id": "aiCallTree.view",
+          "id": "aiCallStack.view",
           "name": "Call Tree"
         }
       ]
     },
     "commands": [
       {
-        "command": "aiCallTree.open",
+        "command": "aiCallStack.open",
         "title": "Open Call Tree",
         "category": "Call Tree"
       },
       {
-        "command": "aiCallTree.installHooks",
+        "command": "aiCallStack.installHooks",
         "title": "Install Copilot Hooks",
         "category": "Call Tree",
         "icon": "$(plug)"
       },
       {
-        "command": "aiCallTree.uninstallHooks",
+        "command": "aiCallStack.uninstallHooks",
         "title": "Remove Copilot Hooks",
         "category": "Call Tree"
       },
       {
-        "command": "aiCallTree.clear",
+        "command": "aiCallStack.clear",
         "title": "Clear Recorded Calls",
         "category": "Call Tree",
         "icon": "$(clear-all)"
@@ -63,15 +63,15 @@
     ],
     "chatParticipants": [
       {
-        "id": "ai-call-tree.calltree",
+        "id": "ai-call-stack.calltree",
         "name": "calltree",
         "description": "Show the call tree of the current Copilot session as text"
       }
     ],
     "configuration": {
-      "title": "AI Call Tree",
+      "title": "AI Call Stack",
       "properties": {
-        "aiCallTree.defaultView": {
+        "aiCallStack.defaultView": {
           "type": "string",
           "enum": [
             "tree",
@@ -85,18 +85,18 @@
     "menus": {
       "view/title": [
         {
-          "command": "aiCallTree.clear",
-          "when": "view == aiCallTree.view",
+          "command": "aiCallStack.clear",
+          "when": "view == aiCallStack.view",
           "group": "navigation@1"
         },
         {
-          "command": "aiCallTree.installHooks",
-          "when": "view == aiCallTree.view",
+          "command": "aiCallStack.installHooks",
+          "when": "view == aiCallStack.view",
           "group": "9_hooks@1"
         },
         {
-          "command": "aiCallTree.uninstallHooks",
-          "when": "view == aiCallTree.view",
+          "command": "aiCallStack.uninstallHooks",
+          "when": "view == aiCallStack.view",
           "group": "9_hooks@2"
         }
       ]

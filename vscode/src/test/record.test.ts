@@ -100,7 +100,7 @@ test('the script writes a line per event, prints {}, and survives garbage', () =
   const dir = tmp()
   const script = path.join(__dirname, '..', 'record.js')
   const run = (event: string, input: string) =>
-    spawnSync(process.execPath, [script, event], { input, env: { ...process.env, AI_CALL_TREE_DIR: dir } })
+    spawnSync(process.execPath, [script, event], { input, env: { ...process.env, AI_CALL_STACK_DIR: dir } })
 
   const a = run('UserPromptSubmit', JSON.stringify({ session_id: 'sess', cwd: '/w', prompt: 'hello' }))
   assert.equal(a.status, 0)

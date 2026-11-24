@@ -11,8 +11,8 @@ import type { Session } from './model'
 import { foldableIds, isRunning, renderBody, renderText, summaryMarkdown } from './render'
 import { EventStore } from './store'
 
-const VIEW = 'aiCallTree.view'
-const dataDir = () => process.env.AI_CALL_TREE_DIR || path.join(os.homedir(), '.copilot', 'ai-call-tree')
+const VIEW = 'aiCallStack.view'
+const dataDir = () => process.env.AI_CALL_STACK_DIR || path.join(os.homedir(), '.copilot', 'ai-call-stack')
 
 const workspaceFolders = () => (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath)
 
@@ -44,7 +44,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
   ) {
     this.mode =
       ctx.globalState.get<'tree' | 'waterfall' | 'files'>('mode') ??
-      vscode.workspace.getConfiguration('aiCallTree').get<'tree' | 'waterfall'>('defaultView', 'waterfall')
+      vscode.workspace.getConfiguration('aiCallStack').get<'tree' | 'waterfall'>('defaultView', 'waterfall')
     // A new prompt folds the ones before it; what history there is, folds but the latest.
     collapseOlder(store.model.sessions.values(), this.seen, this.folded)
     ctx.subscriptions.push(
@@ -161,13 +161,13 @@ class CallTreeView implements vscode.WebviewViewProvider {
         this.selected = ''
         break
       case 'install':
-        await vscode.commands.executeCommand('aiCallTree.installHooks')
+        await vscode.commands.executeCommand('aiCallStack.installHooks')
         break
       case 'installUser':
-        await vscode.commands.executeCommand('aiCallTree.installHooks', 'user')
+        await vscode.commands.executeCommand('aiCallStack.installHooks', 'user')
         break
       case 'installWorkspace':
-        await vscode.commands.executeCommand('aiCallTree.installHooks', 'workspace')
+        await vscode.commands.executeCommand('aiCallStack.installHooks', 'workspace')
         break
       case 'openSettings':
         await vscode.commands.executeCommand('workbench.action.openSettings', 'chat.useHooks')
@@ -294,10 +294,10 @@ export function activate(ctx: vscode.ExtensionContext): void {
     vscode.window.registerWebviewViewProvider(VIEW, provider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
-    vscode.commands.registerCommand('aiCallTree.open', () => vscode.commands.executeCommand(`${VIEW}.focus`)),
-    vscode.commands.registerCommand('aiCallTree.installHooks', installHooks),
-    vscode.commands.registerCommand('aiCallTree.uninstallHooks', uninstallHooks),
-    vscode.commands.registerCommand('aiCallTree.clear', () => {
+    vscode.commands.registerCommand('aiCallStack.open', () => vscode.commands.executeCommand(`${VIEW}.focus`)),
+    vscode.commands.registerCommand('aiCallStack.installHooks', installHooks),
+    vscode.commands.registerCommand('aiCallStack.uninstallHooks', uninstallHooks),
+    vscode.commands.registerCommand('aiCallStack.clear', () => {
       store.clear(store.model.list(workspaceFolders()).map(s => s.id))
     }),
   )
@@ -312,16 +312,16 @@ export function activate(ctx: vscode.ExtensionContext): void {
         "Don't ask again",
       )
       .then(answer => {
-        if (answer === 'Install hooks') void vscode.commands.executeCommand('aiCallTree.installHooks')
+        if (answer === 'Install hooks') void vscode.commands.executeCommand('aiCallStack.installHooks')
         if (answer === "Don't ask again") void ctx.globalState.update(PROMPTED, true)
       })
   }
 
   // `@calltree` in the chat: the tree as text, the counterpart of the original's `/call-tree`.
   if (vscode.chat?.createChatParticipant) {
-    const participant = vscode.chat.createChatParticipant('ai-call-tree.calltree', async (_req, _chat, stream) => {
+    const participant = vscode.chat.createChatParticipant('ai-call-stack.calltree', async (_req, _chat, stream) => {
       stream.markdown('```text\n' + renderText(provider.current(), Date.now()) + '\n```')
-      stream.button({ command: 'aiCallTree.open', title: 'Open the call tree pane' })
+      stream.button({ command: 'aiCallStack.open', title: 'Open the call tree pane' })
     })
     participant.iconPath = new vscode.ThemeIcon('type-hierarchy')
     ctx.subscriptions.push(participant)

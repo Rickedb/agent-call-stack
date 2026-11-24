@@ -95,7 +95,7 @@ export type Node = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'ai-call-tree': {
+    'ai-call-stack': {
       nodes: Shaped<Node[]>
       /** The id of the prompt now running (or last run). */
       root: Shaped<string>

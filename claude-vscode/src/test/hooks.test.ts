@@ -21,7 +21,7 @@ import {
 } from '../hooks'
 
 const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'call-tree-'))
-const REC = '/home/u/.claude/ai-call-tree-vscode/record.cjs'
+const REC = '/home/u/.claude/ai-call-stack-vscode/record.cjs'
 
 test('our hooks are added for every event, and what else the settings hold is left alone', () => {
   const mine = {
@@ -55,7 +55,7 @@ test('adding twice adds nothing more, and removing leaves the settings as they w
   // Only ours: `hooks` goes with them.
   assert.deepEqual(withoutHooks(withHooks({ theme: 'dark' }, REC)), { theme: 'dark' })
   // A moved recorder replaces the old entries, it does not add to them.
-  const moved = withHooks(once, '/other/.claude/ai-call-tree-vscode/record.cjs') as { hooks: Record<string, unknown[]> }
+  const moved = withHooks(once, '/other/.claude/ai-call-stack-vscode/record.cjs') as { hooks: Record<string, unknown[]> }
   assert.equal(moved.hooks.Stop?.length, 2)
   assert.match(JSON.stringify(moved), /other/)
   assert.doesNotMatch(JSON.stringify(moved), /home\/u/)
@@ -67,10 +67,10 @@ test('the file is written with a backup of what it was, once, and removed cleanl
   fs.writeFileSync(file, JSON.stringify({ theme: 'dark' }, null, 2))
   installHookFile(file, REC)
   assert.equal(hooksInstalledIn(file), true)
-  assert.deepEqual(JSON.parse(fs.readFileSync(`${file}.ai-call-tree.bak`, 'utf8')), { theme: 'dark' })
+  assert.deepEqual(JSON.parse(fs.readFileSync(`${file}.ai-call-stack.bak`, 'utf8')), { theme: 'dark' })
   installHookFile(file, REC)
   // The backup stays what the person had, not what we wrote first.
-  assert.deepEqual(JSON.parse(fs.readFileSync(`${file}.ai-call-tree.bak`, 'utf8')), { theme: 'dark' })
+  assert.deepEqual(JSON.parse(fs.readFileSync(`${file}.ai-call-stack.bak`, 'utf8')), { theme: 'dark' })
   assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).theme, 'dark')
 
   assert.equal(removeHookFile(file), true)
@@ -96,7 +96,7 @@ test('a file that is not there is made, with its folder', () => {
   assert.deepEqual(readSettings(file), {})
   installHookFile(file, REC)
   assert.equal(hooksInstalledIn(file), true)
-  assert.equal(fs.existsSync(`${file}.ai-call-tree.bak`), false)
+  assert.equal(fs.existsSync(`${file}.ai-call-stack.bak`), false)
   fs.rmSync(dir, { recursive: true })
 })
 
