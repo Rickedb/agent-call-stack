@@ -3,7 +3,7 @@ import type { Node } from '../types'
 
 /** What the panel is showing, as the extension host keeps it. */
 export type View = {
-  mode: 'tree' | 'waterfall' | 'files'
+  mode: 'tree' | 'waterfall'
   /** The row whose details show, in a modal; '' for none. */
   selected: string
   /** The ids of the rows whose children are folded away. */
@@ -36,8 +36,6 @@ export type Ctx = {
   below: (n: Node) => Node[]
   promptNo: Map<string, number>
   isWaterfall: boolean
-  /** The view that draws what each prompt touched, instead of its rows. */
-  isFiles: boolean
 }
 
 /** One level above a row: does its branch go on below. */

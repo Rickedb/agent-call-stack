@@ -123,15 +123,6 @@ hr { border: 0; border-top: 1px solid var(--vscode-panel-border); margin: 12px 0
 .tag { flex: none; }
 .tag.err { color: var(--c-err); }
 
-/* The Touched view: files, commands and lookups of a prompt. */
-.tv { display: flex; flex-direction: column; gap: 6px; }
-.tv-head { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.tv-arg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tv-block { display: flex; flex-direction: column; gap: 4px; }
-.tv-title { letter-spacing: .04em; }
-.tv-line { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.tv-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
-.tv-name.mono { direction: ltr; font-family: var(--vscode-editor-font-family, monospace); }
 .tv-calls { display: flex; flex-wrap: wrap; gap: 2px 10px; padding-left: 12px; }
 .tv-call { padding: 0; background: none; border-radius: 2px; }
 .tv-call:hover { text-decoration: underline; }
@@ -146,10 +137,6 @@ hr { border: 0; border-top: 1px solid var(--vscode-panel-border); margin: 12px 0
 .op-or { color: var(--c-run); }
 .op-pipe { color: var(--c-agent); }
 .op-seq { color: var(--vscode-descriptionForeground); }
-.tv-tree { display: flex; flex-direction: column; gap: 2px; }
-.tv-node { display: flex; flex-direction: column; gap: 2px; }
-.tv-kids { display: flex; flex-direction: column; gap: 2px; margin-left: 6px; padding-left: 10px; border-left: 1px solid var(--vscode-tree-indentGuidesStroke, color-mix(in srgb, var(--vscode-foreground) 25%, transparent)); }
 .tv-delta { flex: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tv-add { color: var(--c-tool); }
 .tv-del { color: var(--c-err); }
-.tv-total { padding-top: 4px; margin-top: 2px; border-top: 1px solid color-mix(in srgb, var(--vscode-foreground) 20%, transparent); }

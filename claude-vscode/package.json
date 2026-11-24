@@ -68,11 +68,10 @@
           "type": "string",
           "enum": [
             "tree",
-            "waterfall",
-            "files"
+            "waterfall"
           ],
           "default": "waterfall",
-          "description": "How the rows draw at first: a tree of duration bars, a waterfall on a time axis, or what each prompt touched."
+          "description": "How the rows draw at first: a tree of duration bars, or a waterfall on a time axis."
         }
       }
     },

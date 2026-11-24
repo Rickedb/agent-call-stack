@@ -1,5 +1,8 @@
 import type { Node } from '../types'
-import { changeIn } from './touched'
+
+/** What one call added to a file and took out of it, when the call is done (a failed edit changed nothing). */
+const changeIn = (n: Node, path: string): { added: number; removed: number } | undefined =>
+  n.status === 'ok' ? n.touch?.changes?.find(c => c.path === path) : undefined
 
 /** What a tool call involved: a file, an address it fetched, a command it ran, what it searched for. */
 export type Resource = {

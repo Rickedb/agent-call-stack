@@ -29,7 +29,6 @@ export const makeCtx = (s: Session, v: View): Ctx => {
     below,
     promptNo: new Map(prompts.map((n, i) => [n.id, i + 1])),
     isWaterfall: v.mode === 'waterfall',
-    isFiles: v.mode === 'files',
   }
 }
 

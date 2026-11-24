@@ -63,7 +63,7 @@ export function setRoot($: EngineInterface, id: string) {
 export function readMode($: EngineInterface) {
   return read($, mode)
 }
-export function setMode($: EngineInterface, value: 'tree' | 'waterfall' | 'files') {
+export function setMode($: EngineInterface, value: 'tree' | 'waterfall') {
   return update($, mode, () => value)
 }
 

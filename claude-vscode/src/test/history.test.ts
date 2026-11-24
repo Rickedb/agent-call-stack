@@ -165,6 +165,5 @@ test('the reader reads history once the transcript is there, and a history promp
   assert.equal(rep?.perms, undefined)
   const html = renderBody(s, view({ selected: (s.nodes.find(n => n.name === 'Edit') as Node).id }))
   assert.match(html, /read back from the transcript, from before the hooks/)
-  assert.match(renderBody(s, view({ mode: 'files', now: ms(1000) })), /login\.ts/)
   fs.rmSync(dir, { recursive: true })
 })

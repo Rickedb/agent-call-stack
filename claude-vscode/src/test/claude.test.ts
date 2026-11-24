@@ -307,53 +307,6 @@ test('the details give the permission, the usage, the compaction and the summary
   assert.match(compact, /The user asked\./)
 })
 
-test('the Touched view counts the wait apart from the model and other time', () => {
-  const html = renderBody(finished(), view({ mode: 'files', now: 10_000 }))
-  assert.match(html, /1 file \(0 changed, 1 read only\) · 1 command/)
-  assert.match(html, /waited on you 4\.7s/)
-  assert.match(html, /tag warn[^>]*>asked, waited 4\.7s/)
-})
-
-test('the Touched view is a tree of the tool calls, each with the files it touched and its lines, then a summary of files and the total', () => {
-  const s = run(
-    ev(10, { kind: 'prompt', arg: 'refactor' }),
-    ev(20, { kind: 'tool_pre', tool: 'Edit', toolUseId: 'e1', arg: '', touch: { op: 'edit', paths: ['/p/src/pane/row.tsx'], changes: [{ path: '/p/src/pane/row.tsx', added: 10, removed: 2 }] } }),
-    ev(30, { kind: 'tool_post', tool: 'Edit', toolUseId: 'e1', output: 'ok' }),
-    ev(40, { kind: 'tool_pre', tool: 'Edit', toolUseId: 'e2', arg: '', touch: { op: 'edit', paths: ['/p/src/pane/row.tsx'], changes: [{ path: '/p/src/pane/row.tsx', added: 3, removed: 0 }] } }),
-    ev(50, { kind: 'tool_post', tool: 'Edit', toolUseId: 'e2', output: 'ok' }),
-    ev(60, { kind: 'tool_pre', tool: 'Edit', toolUseId: 'e3', arg: '', touch: { op: 'edit', paths: ['/p/src/pane/row.tsx'], changes: [{ path: '/p/src/pane/row.tsx', added: 99, removed: 99 }] } }),
-    ev(70, { kind: 'tool_fail', tool: 'Edit', toolUseId: 'e3', output: 'ok' }),
-    ev(80, { kind: 'tool_pre', tool: 'Write', toolUseId: 'w1', arg: '', touch: { op: 'write', paths: ['/p/src/touch.ts'], changes: [{ path: '/p/src/touch.ts', added: 5, removed: 0 }] } }),
-    ev(90, { kind: 'tool_post', tool: 'Write', toolUseId: 'w1', output: 'ok' }),
-    ev(100, { kind: 'tool_pre', tool: 'MultiEdit', toolUseId: 'm1', arg: '', touch: { op: 'edit', paths: ['/p/src/a.ts', '/p/src/b.ts'], changes: [{ path: '/p/src/a.ts', added: 1, removed: 1 }, { path: '/p/src/b.ts', added: 2, removed: 0 }] } }),
-    ev(110, { kind: 'tool_post', tool: 'MultiEdit', toolUseId: 'm1', output: 'ok' }),
-    ev(120, { kind: 'tool_pre', tool: 'Read', toolUseId: 'r1', arg: '', touch: { op: 'read', paths: ['/p/src/pane/bar.tsx'] } }),
-    ev(130, { kind: 'tool_post', tool: 'Read', toolUseId: 'r1', output: 'ok' }),
-    ev(140, { kind: 'tool_pre', tool: 'Bash', toolUseId: 'c1', arg: '', touch: { op: 'run', paths: [], what: 'npm test' } }),
-    ev(150, { kind: 'tool_post', tool: 'Bash', toolUseId: 'c1', output: 'ok' }),
-    ev(160, { kind: 'stop' }),
-  )
-  const html = renderBody(s, view({ mode: 'files' }))
-  // The calls in the order they ran, each with its file under it.
-  assert.match(html, /CALLS · under …\/p\/src/)
-  assert.match(
-    html,
-    /tv-call[^>]*>Edit [^<]*<\/button>[\s\S]*?<bdi>pane\/row\.tsx<\/bdi>[\s\S]*?tv-add">\+10<[\s\S]*?tv-del">−2<[\s\S]*?tv-call[^>]*>Edit [^<]*<\/button>[\s\S]*?tv-add">\+3<[\s\S]*?tv-call[^>]*>Edit [^<]*✗<\/button>[\s\S]*?tv-call[^>]*>Write [^<]*<\/button>[\s\S]*?<bdi>touch\.ts<\/bdi>[\s\S]*?tv-add">\+5<[\s\S]*?tv-call[^>]*>Read /,
-  )
-  // A failed edit changed nothing: its file shows no lines.
-  assert.doesNotMatch(html, /\+99/)
-  // A call that touched several files sums them on its own row.
-  assert.match(html, /tv-call[^>]*>MultiEdit [^<]*<\/button>\s*\n?\s*<span class="tv-delta"[^>]*><span class="tv-add">\+3<\/span> <span class="tv-del">−1</)
-  // The summary of each file, and the total of all.
-  assert.match(html, /FILES · under …\/p\/src/)
-  assert.match(html, /<bdi>pane\/row\.tsx<\/bdi>[^]*?E3[^]*?tv-add">\+13<[^]*?tv-del">−2</)
-  assert.match(html, /\+21 −3 lines/)
-  assert.match(html, /<b>Total<\/b>[^]*?5 files · 4 changed[^]*?tv-add">\+21<[^]*?tv-del">−3</)
-  // A command is a call too, with what it ran.
-  assert.match(html, /tv-call[^>]*>npm [^<]*<\/button>[^]*?mono[^>]*>npm test</)
-  assert.doesNotMatch(html, /COMMANDS|LOOKUPS/)
-})
-
 test('a call shows what it involved under its row, in the tree and the waterfall, and a click opens the details', () => {
   const s = run(
     ev(10, { kind: 'prompt', arg: 'look into login' }),

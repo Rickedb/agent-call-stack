@@ -50,12 +50,11 @@ export const toolbar = (c: Ctx): string => {
   const isAllFolded = foldable.length > 0 && foldable.every(id => v.folded.has(id))
   return `<div class="bar">
       <div class="seg">
-        ${button('mode', 'Tree', 'data-v="tree"', c.isWaterfall || c.isFiles ? '' : 'primary')}
+        ${button('mode', 'Tree', 'data-v="tree"', c.isWaterfall ? '' : 'primary')}
         ${button('mode', 'Waterfall', 'data-v="waterfall"', c.isWaterfall ? 'primary' : '')}
-        ${button('mode', 'Touched', 'data-v="files" title="The files, commands and lookups of each prompt"', c.isFiles ? 'primary' : '')}
       </div>
       ${picker(v)}
-      ${foldable.length && !c.isFiles ? button('foldAll', isAllFolded ? 'unfold all' : 'fold all', '', 'plain') : ''}
+      ${foldable.length ? button('foldAll', isAllFolded ? 'unfold all' : 'fold all', '', 'plain') : ''}
     </div>`
 }
 

@@ -37,7 +37,7 @@ const hooksInstalled = () => settingsFiles().some(hooksInstalledIn)
 class CallTreeView implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView
   private timer?: NodeJS.Timeout
-  private mode: 'tree' | 'waterfall' | 'files'
+  private mode: 'tree' | 'waterfall'
   private selected = ''
   private picked = ''
   private folded = new Set<string>()
@@ -51,9 +51,14 @@ class CallTreeView implements vscode.WebviewViewProvider {
     private ctx: vscode.ExtensionContext,
     private store: EventStore,
   ) {
+    // A mode saved by an earlier version (the Touched view, now gone) is not one of the two.
+    const saved = ctx.globalState.get<string>('mode')
     this.mode =
-      ctx.globalState.get<'tree' | 'waterfall' | 'files'>('mode') ??
-      vscode.workspace.getConfiguration('aiCallStackClaude').get<'tree' | 'waterfall' | 'files'>('defaultView', 'waterfall')
+      saved === 'tree' || saved === 'waterfall'
+        ? saved
+        : vscode.workspace.getConfiguration('aiCallStackClaude').get<string>('defaultView') === 'tree'
+          ? 'tree'
+          : 'waterfall'
     // A new prompt folds the ones before it; what history there is, folds but the latest.
     collapseOlder(store.model.sessions.values(), this.seen, this.folded)
     ctx.subscriptions.push(
@@ -134,7 +139,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
       case 'ready':
         break
       case 'mode':
-        this.mode = m.v === 'tree' ? 'tree' : m.v === 'files' ? 'files' : 'waterfall'
+        this.mode = m.v === 'tree' ? 'tree' : 'waterfall'
         void this.ctx.globalState.update('mode', this.mode)
         break
       case 'select':

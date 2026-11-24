@@ -104,7 +104,7 @@ declare module 'claude-code' {
       /** The id of the prompt now running (or last run). */
       root: Shaped<string>
       /** How the rows draw: a tree of duration bars, or a waterfall on a time axis. */
-      mode: Shaped<'tree' | 'waterfall' | 'files'>
+      mode: Shaped<'tree' | 'waterfall'>
       /** The row whose details show; '' for none. */
       selected: Shaped<string>
       /** The ids of the rows whose children are folded away. */

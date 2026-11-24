@@ -198,97 +198,12 @@ test('the transcript path is read from the events that carry it, and shown with 
   assert.doesNotMatch(renderBody(s, view({ selected: s.nodes[3]?.id ?? '' })), /Copy transcript path/)
 })
 
-test('the Touched view lists files, commands and lookups, and a call opens in the modal', () => {
-  const s = session(
-    ev({ kind: 'prompt', arg: 'fix login' }),
-    ev({ kind: 'tool_pre', tool: 'read_file', toolUseId: 'r1', arg: '/p/src/login.ts', input: 'filePath: /p/src/login.ts', touch: { op: 'read', paths: ['/p/src/login.ts'] } }),
-    ev({ kind: 'tool_post', tool: 'read_file', toolUseId: 'r1', output: 'text' }),
-    ev({ kind: 'tool_pre', tool: 'replace_string_in_file', toolUseId: 'e1', arg: '/p/src/login.ts', touch: { op: 'edit', paths: ['/p/src/login.ts'] } }),
-    ev({ kind: 'tool_fail', tool: 'replace_string_in_file', toolUseId: 'e1', output: 'no match' }),
-    ev({ kind: 'tool_pre', tool: 'replace_string_in_file', toolUseId: 'e2', arg: '/p/src/login.ts', touch: { op: 'edit', paths: ['/p/src/login.ts'] } }),
-    ev({ kind: 'tool_post', tool: 'replace_string_in_file', toolUseId: 'e2', output: 'ok' }),
-    ev({ kind: 'tool_pre', tool: 'read_file', toolUseId: 'r2', arg: '/p/src/util.ts', touch: { op: 'read', paths: ['/p/src/util.ts'] } }),
-    ev({ kind: 'tool_post', tool: 'read_file', toolUseId: 'r2', output: 'text' }),
-    ev({ kind: 'tool_pre', tool: 'run_in_terminal', toolUseId: 'c1', arg: 'npm test', touch: { op: 'run', paths: [], what: 'npm test' } }),
-    ev({ kind: 'tool_post', tool: 'run_in_terminal', toolUseId: 'c1', output: 'ok' }),
-    ev({ kind: 'tool_pre', tool: 'grep_search', toolUseId: 'g1', arg: 'login', touch: { op: 'search', paths: [], what: 'login' } }),
-    ev({ kind: 'tool_post', tool: 'grep_search', toolUseId: 'g1', output: 'hits' }),
-    ev({ kind: 'stop' }),
-  )
-  const html = renderBody(s, view({ mode: 'files' }))
-  assert.match(html, /2 files \(1 changed, 1 read only\) · 1 command · 1 lookup/)
-  assert.match(html, /calls ran .* of .* · model and other time/)
-  assert.match(html, /FILES · under …\/p\/src/)
-  assert.match(html, /<bdi>login\.ts<\/bdi>/)
-  assert.match(html, /<bdi>util\.ts<\/bdi>/)
-  // The changed file comes first; it was read, then edited twice, the first edit failing.
-  assert.ok(html.indexOf('login.ts</bdi>') < html.indexOf('util.ts</bdi>'))
-  assert.match(html, />R1 E2</)
-  assert.match(html, /retried 1×/)
-  assert.match(html, /✗1/)
-  // The commands and lookups are calls too, with what they ran or looked for.
-  assert.match(html, /CALLS · under …\/p\/src/)
-  assert.match(html, /mono[^>]*>npm test</)
-  assert.match(html, /tv-call[^>]*>grep_search [^<]*<\/button>[^]*?>login</)
-  // No rows of the other views, and no fold-all.
-  assert.doesNotMatch(html, /class="row/)
-  assert.doesNotMatch(html, /data-act="foldAll"/)
-  // The toolbar says which view it is; the other views are one press away.
-  assert.match(html, /data-v="files"[^>]*>Touched<\/button>/)
-  assert.match(html, /class="btn primary" data-act="mode" data-v="files"/)
-  // A call is a button that opens its details.
-  const call = s.nodes.find(n => n.name === 'run_in_terminal')!
-  assert.match(html, new RegExp(`class="tv-call [^"]*" data-act="select" data-id="${call.id.replace(/[#:]/g, '.')}"`))
-  assert.match(renderBody(s, view({ mode: 'files', selected: call.id })), /class="modal/)
-  assert.doesNotMatch(renderBody(s, view({ mode: 'tree' })), /tv-call/)
-})
-
 test('a tool call start carries what it touched', () => {
   const ev = normalize('PreToolUse', { session_id: 's', tool_name: 'replace_string_in_file', tool_input: { filePath: '/p/a.ts', oldString: 'x' } }, 1) as Ev
   assert.deepEqual(ev.touch, { op: 'edit', paths: ['/p/a.ts'] })
   assert.equal(normalize('PostToolUse', { session_id: 's', tool_name: 'x', tool_input: { filePath: '/p/a.ts' } }, 1)?.touch, undefined)
   const cmd = normalize('PreToolUse', { sessionId: 's', toolName: 'run_in_terminal', toolArgs: JSON.stringify({ command: 'ls' }) }, 1) as Ev
   assert.deepEqual(cmd.touch, { op: 'run', paths: [], what: 'ls' })
-})
-
-test('the Touched view is a tree of the tool calls, each with the files it touched and its lines, then a summary of files and the total', () => {
-  const s = session(
-    ev({ kind: 'prompt', arg: 'refactor' }),
-    ev({ kind: 'tool_pre', tool: 'Edit', toolUseId: 'e1', arg: '', touch: { op: 'edit', paths: ['/p/src/pane/row.tsx'], changes: [{ path: '/p/src/pane/row.tsx', added: 10, removed: 2 }] } }),
-    ev({ kind: 'tool_post', tool: 'Edit', toolUseId: 'e1', output: 'ok' }),
-    ev({ kind: 'tool_pre', tool: 'Edit', toolUseId: 'e2', arg: '', touch: { op: 'edit', paths: ['/p/src/pane/row.tsx'], changes: [{ path: '/p/src/pane/row.tsx', added: 3, removed: 0 }] } }),
-    ev({ kind: 'tool_post', tool: 'Edit', toolUseId: 'e2', output: 'ok' }),
-    ev({ kind: 'tool_pre', tool: 'Edit', toolUseId: 'e3', arg: '', touch: { op: 'edit', paths: ['/p/src/pane/row.tsx'], changes: [{ path: '/p/src/pane/row.tsx', added: 99, removed: 99 }] } }),
-    ev({ kind: 'tool_fail', tool: 'Edit', toolUseId: 'e3', output: 'ok' }),
-    ev({ kind: 'tool_pre', tool: 'Write', toolUseId: 'w1', arg: '', touch: { op: 'write', paths: ['/p/src/touch.ts'], changes: [{ path: '/p/src/touch.ts', added: 5, removed: 0 }] } }),
-    ev({ kind: 'tool_post', tool: 'Write', toolUseId: 'w1', output: 'ok' }),
-    ev({ kind: 'tool_pre', tool: 'MultiEdit', toolUseId: 'm1', arg: '', touch: { op: 'edit', paths: ['/p/src/a.ts', '/p/src/b.ts'], changes: [{ path: '/p/src/a.ts', added: 1, removed: 1 }, { path: '/p/src/b.ts', added: 2, removed: 0 }] } }),
-    ev({ kind: 'tool_post', tool: 'MultiEdit', toolUseId: 'm1', output: 'ok' }),
-    ev({ kind: 'tool_pre', tool: 'Read', toolUseId: 'r1', arg: '', touch: { op: 'read', paths: ['/p/src/pane/bar.tsx'] } }),
-    ev({ kind: 'tool_post', tool: 'Read', toolUseId: 'r1', output: 'ok' }),
-    ev({ kind: 'tool_pre', tool: 'Bash', toolUseId: 'c1', arg: '', touch: { op: 'run', paths: [], what: 'npm test' } }),
-    ev({ kind: 'tool_post', tool: 'Bash', toolUseId: 'c1', output: 'ok' }),
-    ev({ kind: 'stop' }),
-  )
-  const html = renderBody(s, view({ mode: 'files' }))
-  // The calls in the order they ran, each with its file under it.
-  assert.match(html, /CALLS · under …\/p\/src/)
-  assert.match(
-    html,
-    /tv-call[^>]*>Edit [^<]*<\/button>[\s\S]*?<bdi>pane\/row\.tsx<\/bdi>[\s\S]*?tv-add">\+10<[\s\S]*?tv-del">−2<[\s\S]*?tv-call[^>]*>Edit [^<]*<\/button>[\s\S]*?tv-add">\+3<[\s\S]*?tv-call[^>]*>Edit [^<]*✗<\/button>[\s\S]*?tv-call[^>]*>Write [^<]*<\/button>[\s\S]*?<bdi>touch\.ts<\/bdi>[\s\S]*?tv-add">\+5<[\s\S]*?tv-call[^>]*>Read /,
-  )
-  // A failed edit changed nothing: its file shows no lines.
-  assert.doesNotMatch(html, /\+99/)
-  // A call that touched several files sums them on its own row.
-  assert.match(html, /tv-call[^>]*>MultiEdit [^<]*<\/button>\s*\n?\s*<span class="tv-delta"[^>]*><span class="tv-add">\+3<\/span> <span class="tv-del">−1</)
-  // The summary of each file, and the total of all.
-  assert.match(html, /FILES · under …\/p\/src/)
-  assert.match(html, /<bdi>pane\/row\.tsx<\/bdi>[^]*?E3[^]*?tv-add">\+13<[^]*?tv-del">−2</)
-  assert.match(html, /\+21 −3 lines/)
-  assert.match(html, /<b>Total<\/b>[^]*?5 files · 4 changed[^]*?tv-add">\+21<[^]*?tv-del">−3</)
-  // A command is a call too, with what it ran.
-  assert.match(html, /tv-call[^>]*>npm [^<]*<\/button>[^]*?mono[^>]*>npm test</)
-  assert.doesNotMatch(html, /COMMANDS|LOOKUPS/)
 })
 
 test('a call shows what it involved under its row, in the tree and the waterfall, and a click opens the details', () => {

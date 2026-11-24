@@ -2,7 +2,6 @@ import type { Session } from '../model'
 import { index, makeCtx } from './context'
 import { modal, resourceModal } from './modal'
 import { section } from './rows'
-import { touchedView } from './touched'
 import { empty, picker, summary, toolbar } from './toolbar'
 import type { View } from './types'
 
@@ -30,7 +29,7 @@ export const renderBody = (s: Session | undefined, v: View): string => {
     summary(c),
     [...c.prompts]
       .reverse()
-      .map((top, i) => `${i > 0 ? '<hr>' : ''}${c.isFiles ? touchedView(c, top) : section(c, top)}`)
+      .map((top, i) => `${i > 0 ? '<hr>' : ''}${section(c, top)}`)
       .join(''),
     picked ? modal(c, picked) : pickedRes ? resourceModal(c, pickedRes.node, pickedRes.res) : '',
   ].join('\n')
