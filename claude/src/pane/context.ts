@@ -1,6 +1,7 @@
 import type { EngineInterface } from 'claude-code'
 
 import type { Node } from '../../types'
+import type { Resource } from '../resources'
 
 /** The element table of the surface being drawn: `Box`, `Text`, `Button`. */
 export type Els = ReturnType<EngineInterface['ui']['resolve']>
@@ -40,7 +41,10 @@ export type Lane = { last: boolean }
 
 /** A row's place in the tree. */
 export type Place = {
+  /** The row's call or prompt; for a resource row, the call it belongs to. */
   node: Node
+  /** Set for a row of something the call involved (a file, an address, a command) instead of the call itself. */
+  res?: Resource
   depth: number
   hidden: number
   /** For each level above it, from the prompt's children down. */
@@ -51,6 +55,7 @@ export type Place = {
 
 /** What a prompt's section works out once for its rows. */
 export type Section = {
+  top: Node
   t0: number
   t1: number
   slowest: Node | undefined

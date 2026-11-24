@@ -1,4 +1,5 @@
 import type { Session } from '../model'
+import { resourcesOf } from '../resources'
 import type { Node } from '../types'
 import { span } from './format'
 import type { Ctx, View } from './types'
@@ -23,6 +24,7 @@ export const makeCtx = (s: Session, v: View): Ctx => {
     list,
     prompts,
     byId: new Map(list.map(n => [n.id, n])),
+    resById: new Map(list.flatMap(node => resourcesOf(node).map(res => [res.id, { res, node }] as const))),
     kids,
     below,
     promptNo: new Map(prompts.map((n, i) => [n.id, i + 1])),

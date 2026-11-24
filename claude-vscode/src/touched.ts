@@ -15,6 +15,9 @@ export type FileTouch = {
   ms: number
   tokens: number
   failed: number
+  /** The lines its finished calls added and took out, from their arguments. */
+  added: number
+  removed: number
   /** Reads of the file again with nothing written to it in between. */
   rereads: number
   /** Calls that did the same to the file right after one that failed. */
@@ -35,11 +38,16 @@ export type Group = {
 export type Touched = {
   /** Files changed first, then the most touched. */
   files: FileTouch[]
+  /** Every call that touched something, in the order they started. */
+  calls: Node[]
   commands: Group[]
   lookups: Group[]
   /** Files the prompt changed or created, and files it only read. */
   edited: number
   readOnly: number
+  /** The lines added and taken out, over all the files. */
+  added: number
+  removed: number
   /** The prompt's time, how much of it a call was running, and how long a call waited for the person. */
   wall: number
   busy: number
@@ -83,6 +91,8 @@ export const touchedOf = (top: Node, below: Node[], now: number): Touched => {
         ms: 0,
         tokens: 0,
         failed: 0,
+        added: 0,
+        removed: 0,
         rereads: 0,
         retries: 0,
       }
@@ -90,6 +100,11 @@ export const touchedOf = (top: Node, below: Node[], now: number): Touched => {
       f.calls.push(n)
       f.tokens += tok(n)
       if (n.status === 'err') f.failed++
+      const c = changeIn(n, path)
+      if (c) {
+        f.added += c.added
+        f.removed += c.removed
+      }
       if (t.op === 'read') {
         f.reads++
         if (st.read) f.rereads++
@@ -117,15 +132,28 @@ export const touchedOf = (top: Node, below: Node[], now: number): Touched => {
   const wall = (top.end ?? now) - top.start
   return {
     files: list,
+    calls,
     commands: [...groups.values()].filter(g => g.kind === 'run'),
     lookups: [...groups.values()].filter(g => g.kind !== 'run'),
     edited: list.filter(f => f.edits + f.writes > 0).length,
     readOnly: list.filter(f => f.edits + f.writes === 0).length,
+    added: list.reduce((n, f) => n + f.added, 0),
+    removed: list.reduce((n, f) => n + f.removed, 0),
     wall,
     busy: busyOf(top, below.filter(n => n.kind === 'tool' || n.kind === 'agent'), now),
     waited: below.reduce((t, n) => t + (n.perm?.waited ?? 0), 0),
   }
 }
+
+/** What one call added to a file and took out of it, when the call is done (a failed edit changed nothing). */
+export const changeIn = (n: Node, path: string): { added: number; removed: number } | undefined =>
+  n.status === 'ok' ? n.touch?.changes?.find(c => c.path === path) : undefined
+
+/** The lines a finished call added and took out over all the files it touched. */
+export const callLines = (n: Node): { added: number; removed: number } =>
+  n.status === 'ok'
+    ? (n.touch?.changes ?? []).reduce((t, c) => ({ added: t.added + c.added, removed: t.removed + c.removed }), { added: 0, removed: 0 })
+    : { added: 0, removed: 0 }
 
 /** The directory every path in the list sits under (whole segments), '' when they share none. */
 export const commonDir = (paths: string[]): string => {

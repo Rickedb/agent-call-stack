@@ -1,3 +1,4 @@
+import type { Resource } from '../resources'
 import type { Node } from '../types'
 
 /** What the panel is showing, as the extension host keeps it. */
@@ -28,6 +29,8 @@ export type Ctx = {
   list: Node[]
   prompts: Node[]
   byId: Map<string, Node>
+  /** What each call involved, by the id of its row, with the call. */
+  resById: Map<string, { res: Resource; node: Node }>
   kids: Map<string, Node[]>
   /** Every row under a node, however deep. */
   below: (n: Node) => Node[]
@@ -42,7 +45,10 @@ export type Lane = { last: boolean }
 
 /** A row's place in the tree. */
 export type Place = {
+  /** The row's call or prompt; for a resource row, the call it belongs to. */
   node: Node
+  /** Set for a row of something the call involved (a file, an address, a command) instead of the call itself. */
+  res?: Resource
   depth: number
   hidden: number
   trail: Lane[]

@@ -6,6 +6,7 @@ import { modelOf } from '../stats'
 import { clearSelected } from '../state'
 import { block } from './block'
 import type { Pane } from './context'
+import { sequence } from './sequence'
 import { compactLine, permLine } from './tags'
 import { mark, tint } from './theme'
 
@@ -65,6 +66,7 @@ export function details($: EngineInterface, c: Pane, n: Node, t0: number, t1: nu
           </Button>
         </Box>
       ) : null}
+      {sequence(c, n)}
       {block($, c, n, 'input')}
       {block($, c, n, 'output')}
       <Button key="close" role="dismiss" onPress={() => void clearSelected($)}>

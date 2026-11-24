@@ -6,6 +6,10 @@ export type Touch = {
   paths: string[]
   /** The command it ran, the address it fetched, what it searched for. */
   what?: string
+  /** For a fetch: the addresses it was given. */
+  links?: string[]
+  /** For an edit or a write: the lines it added to each file and took out of it, from its arguments. */
+  changes?: { path: string; added: number; removed: number }[]
 }
 
 /** One row of the tree: a prompt, a subagent, or a tool call. */

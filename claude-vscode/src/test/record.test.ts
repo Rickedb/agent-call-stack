@@ -130,3 +130,57 @@ test('the script appends one line per event and prints nothing, so the work goes
   assert.equal((JSON.parse(lines[0] as string) as Ev).kind, 'prompt')
   fs.rmSync(dir, { recursive: true })
 })
+
+test('the lines a call added and took out are read from its arguments', () => {
+  const changes = (tool: string, args: Record<string, unknown>) => touchOf(tool, args)?.changes
+  // An edit counts the lines that differ: what the two texts share at the start and the end is left out.
+  assert.deepEqual(changes('Edit', { file_path: '/p/a.ts', old_string: 'a\nb\nc', new_string: 'a\nB\nB2\nc' }), [
+    { path: '/p/a.ts', added: 2, removed: 1 },
+  ])
+  assert.deepEqual(changes('Edit', { file_path: '/p/a.ts', old_string: 'a\nb\n', new_string: '' }), [{ path: '/p/a.ts', added: 0, removed: 2 }])
+  assert.equal(changes('Edit', { file_path: '/p/a.ts', old_string: 'x', new_string: 'x' }), undefined)
+  // A list of edits to one file.
+  assert.deepEqual(
+    changes('MultiEdit', { file_path: '/p/a.ts', edits: [{ old_string: 'a', new_string: 'b' }, { old_string: '', new_string: 'x\ny' }] }),
+    [{ path: '/p/a.ts', added: 3, removed: 1 }],
+  )
+  // A text written whole counts as added: the call does not say what was there.
+  assert.deepEqual(changes('Write', { file_path: '/p/n.ts', content: 'a\nb\nc\n' }), [{ path: '/p/n.ts', added: 3, removed: 0 }])
+  // Copilot's tools: a replacement per file, a created file, code inserted between "existing code" marks.
+  assert.deepEqual(
+    changes('multi_replace_string_in_file', {
+      replacements: [
+        { filePath: '/p/a.ts', oldString: 'x', newString: 'y\nz' },
+        { filePath: '/p/b.ts', oldString: 'q\nr', newString: '' },
+        { filePath: '/p/a.ts', oldString: 'm', newString: 'n' },
+      ],
+    }),
+    [
+      { path: '/p/a.ts', added: 3, removed: 2 },
+      { path: '/p/b.ts', added: 0, removed: 2 },
+    ],
+  )
+  assert.deepEqual(changes('create_file', { filePath: '/p/b.ts', content: 'one\ntwo' }), [{ path: '/p/b.ts', added: 2, removed: 0 }])
+  assert.deepEqual(
+    changes('insert_edit_into_file', { filePath: '/p/a.ts', code: '// ...existing code...\nconst x = 1\n// ...existing code...' }),
+    [{ path: '/p/a.ts', added: 1, removed: 0 }],
+  )
+  // A patch names its files itself.
+  const patch = touchOf('apply_patch', {
+    input: '*** Begin Patch\n*** Update File: /p/a.ts\n@@\n keep\n-old\n+new\n+more\n*** Add File: /p/c.ts\n+hello\n*** End Patch',
+  })
+  assert.deepEqual(patch?.paths, ['/p/a.ts', '/p/c.ts'])
+  assert.deepEqual(patch?.changes, [
+    { path: '/p/a.ts', added: 2, removed: 1 },
+    { path: '/p/c.ts', added: 1, removed: 0 },
+  ])
+  // A read has no lines to count.
+  assert.equal(touchOf('Read', { file_path: '/p/a.ts' })?.changes, undefined)
+})
+
+test('the addresses a fetch was given are kept', () => {
+  assert.deepEqual(touchOf('WebFetch', { url: 'https://x.dev/a', prompt: 'summarize' }), { op: 'web', paths: [], what: 'https://x.dev/a', links: ['https://x.dev/a'] })
+  assert.deepEqual(touchOf('fetch_webpage', { urls: ['https://a.dev', 'https://b.dev', 'https://a.dev'], query: 'q' })?.links, ['https://a.dev', 'https://b.dev'])
+  // A search has a query, not an address.
+  assert.deepEqual(touchOf('WebSearch', { query: 'tsc noEmit' }), { op: 'web', paths: [], what: 'tsc noEmit' })
+})

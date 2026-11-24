@@ -1,8 +1,10 @@
 import type { Session } from '../model'
+import { toolArg, toolName } from '../names'
+import { MAX_RESOURCES, resourcesOf } from '../resources'
 import { reportOf } from '../stats'
 import type { Node } from '../types'
 import { index } from './context'
-import { clip, dur, icon, mark, modelName, sizeOf, span, tokCount, tokText } from './format'
+import { clip, dur, icon, mark, modelName, RES_GLYPH, sizeOf, span, tokCount, tokText } from './format'
 
 /**
  * The tree as plain text, for a chat reply (`@calltree`): the stack of what runs
@@ -16,8 +18,8 @@ export const renderText = (s: Session | undefined, now: number): string => {
 
   const { kids, below } = index(s.nodes)
   const line = (n: Node) => {
-    const name = n.kind === 'prompt' ? `Prompt ${prompts.indexOf(n) + 1}` : n.name
-    const arg = n.arg && n.kind !== 'prompt' ? `(${clip(n.arg, 60)})` : n.kind === 'prompt' ? ` ${clip(n.arg, 60)}` : ''
+    const name = n.kind === 'prompt' ? `Prompt ${prompts.indexOf(n) + 1}` : toolName(n)
+    const arg = toolArg(n) && n.kind !== 'prompt' ? `(${clip(toolArg(n), 60)})` : n.kind === 'prompt' ? ` ${clip(n.arg, 60)}` : ''
     const why = (n.kind === 'prompt' || n.kind === 'agent') && n.why ? ` [${clip(n.why, 40)}]` : ''
     return `${icon(n)} ${mark(n)} ${name}${n.model ? ` [${modelName(n.model)}]` : ''}${why}${arg}`
   }
@@ -27,7 +29,7 @@ export const renderText = (s: Session | undefined, now: number): string => {
   const live = below(top).filter(n => n.status === 'run')
   if (live.length) {
     out.push('Stack (innermost first)')
-    for (const n of [...live].reverse()) out.push(`  at ${icon(n)} ${n.name}${n.arg ? `(${clip(n.arg, 60)})` : ''}  ${dur(span(n, now))}`)
+    for (const n of [...live].reverse()) out.push(`  at ${icon(n)} ${toolName(n)}${toolArg(n) ? `(${clip(toolArg(n), 60)})` : ''}  ${dur(span(n, now))}`)
     out.push('')
   }
 
@@ -37,7 +39,20 @@ export const renderText = (s: Session | undefined, now: number): string => {
     children.forEach((c, i) => {
       const last = i === children.length - 1
       out.push(`${prefix}${last ? '└─' : '├─'} ${line(c)}   ${dur(span(c, now))}${size(c)}`)
-      walk(c, prefix + (last ? '   ' : '│  '))
+      const inner = prefix + (last ? '   ' : '│  ')
+      // What the call involved: its files by name, the addresses it fetched, the command it ran.
+      const res = resourcesOf(c)
+      const rest = (kids.get(c.id) ?? []).length > 0
+      const shown = res.slice(0, MAX_RESOURCES)
+      const items = [
+        ...shown.map(r => {
+          const lines = r.added || r.removed ? ` +${r.added} −${r.removed}` : ''
+          return `${RES_GLYPH[r.kind]} ${clip(r.label, 80)} ${r.op}${lines}`
+        }),
+        ...(res.length > shown.length ? [`+${res.length - shown.length} more`] : []),
+      ]
+      items.forEach((t, j) => out.push(`${inner}${j === items.length - 1 && !rest ? '└─' : '├─'} ${t}`))
+      walk(c, inner)
     })
   }
   walk(top, '')

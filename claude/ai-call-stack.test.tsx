@@ -3,7 +3,9 @@ import { expect, test } from 'claude-code/testing'
 import { settle } from './src/nodes'
 import { modelOf, reportOf } from './src/stats'
 import { touchOf } from './src/touch'
-import { commonDir, touchedOf } from './src/touched'
+import { sequenceOf, shellKind, shellOf, stepsOf, toolArg, toolName } from './src/names'
+import { glyph } from './src/pane/theme'
+import { callLines, commonDir, touchedOf } from './src/touched'
 
 const PANE = {
   plugin: 'ai-call-stack',
@@ -44,7 +46,7 @@ test('the waterfall lists a call and a press opens its details', async ($, on) =
     expect(prompt).toBeDefined()
 
     // The tool row is a Button keyed by the call's id; find it by its words.
-    const row = await ui.find({ type: 'Button', text: /Bash/ })
+    const row = await ui.find({ type: 'Button', text: /\bls\b/ })
     expect(row).toBeDefined()
 
     // The row shows the output's size: "file one\nfile two" is 17 characters, ~5 tokens.
@@ -119,12 +121,12 @@ test('two prompts draw one after the other, with no paging', async ($, on) => {
   expect(opens).toEqual(['open:p2', 'open:p1'])
 
   // The first prompt folded when the second came: its call is hidden, and says so.
-  expect(await ui.find({ type: 'Button', text: /Bash/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Button', text: /\bls\b/ })).toBeUndefined()
   expect(await ui.find({ type: 'Text', text: /\+1/ })).toBeDefined()
 
   // The person can open it again.
   await ui.press({ key: 'fold:p1' })
-  expect(await ui.find({ type: 'Button', text: /Bash/ })).toBeDefined()
+  expect(await ui.find({ type: 'Button', text: /\bls\b/ })).toBeDefined()
   await ui.unmount()
 })
 
@@ -152,7 +154,7 @@ test('a long result is cut in the state and kept whole in a file', async ($, on)
   expect(written[paths[0] ?? '']?.length).toBe(50000)
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  const row = await ui.find({ type: 'Button', text: /Bash/ })
+  const row = await ui.find({ type: 'Button', text: /\bcat\b/ })
   await ui.press({ key: row?.key ?? '' })
   expect(await ui.find({ type: 'Text', text: /first 8,000 of 50,000 characters/ })).toBeDefined()
   // A copy icon on the corner of each text; the file path stays a text button.
@@ -185,7 +187,7 @@ test('the chat before the mod loaded is read back from history', async ($, on) =
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: /what is here/ })).toBeDefined()
-  expect(await ui.find({ type: 'Button', text: /Bash/ })).toBeDefined()
+  expect(await ui.find({ type: 'Button', text: /\bls\b/ })).toBeDefined()
   expect(await ui.find({ type: 'Button', text: /Read/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /Earlier in this chat/ })).toBeDefined()
   // The reminder alone is no prompt.
@@ -213,12 +215,12 @@ test('a live prompt folds the history before it, and sits above it', async ($, o
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   const ui0 = await $.ui.mount({ ...PANE, surface: 'desktop' })
   // Alone, the history's one prompt is the latest, so it is open.
-  expect(await ui0.find({ type: 'Button', text: /Bash/ })).toBeDefined()
+  expect(await ui0.find({ type: 'Button', text: /\bls\b/ })).toBeDefined()
   await ui0.unmount()
 
   await $.turn.start({ text: 'now this', turnId: 'live1' })
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  expect(await ui.find({ type: 'Button', text: /Bash/ })).toBeUndefined()
+  expect(await ui.find({ type: 'Button', text: /\bls\b/ })).toBeUndefined()
   const opens = (await ui.findAll({ type: 'Button' })).map(b => b.key).filter(k => k?.startsWith('open:'))
   expect(opens[0]).toBe('open:live1')
   expect(opens.length).toBe(2)
@@ -659,7 +661,7 @@ test('a call the engine asks about, with nobody to answer, is not allowed', asyn
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: /^ not allowed$/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /Approvals\s+0 allowed · 1 asked you · 1 not allowed/ })).toBeDefined()
-  const row = await ui.find({ type: 'Button', text: /Bash/ })
+  const row = await ui.find({ type: 'Button', text: /\bnpm\b/ })
   await ui.press({ key: row?.key ?? '' })
   expect(await ui.find({ type: 'Text', text: /permission asked you, not allowed · rule Bash\(npm:\*\) · Bash needs approval/ })).toBeDefined()
   await ui.unmount()
@@ -752,13 +754,17 @@ test('a prompt and a subagent say where their transcript is kept, and it copies'
 test('what a call touched is read from its arguments, whatever the tool is called', () => {
   // Claude Code's tools.
   expect(touchOf('Read', { file_path: '/p/a.ts' })).toEqual({ op: 'read', paths: ['/p/a.ts'] })
-  expect(touchOf('Edit', { file_path: '/p/a.ts', old_string: 'x', new_string: 'y' })).toEqual({ op: 'edit', paths: ['/p/a.ts'] })
+  expect(touchOf('Edit', { file_path: '/p/a.ts', old_string: 'x', new_string: 'y' })).toEqual({
+    op: 'edit',
+    paths: ['/p/a.ts'],
+    changes: [{ path: '/p/a.ts', added: 1, removed: 1 }],
+  })
   expect(touchOf('Write', { file_path: '/p/new.ts', content: 'x' })?.op).toBe('write')
   expect(touchOf('NotebookEdit', { notebook_path: '/p/n.ipynb' })?.op).toBe('edit')
   expect(touchOf('Bash', { command: 'npm test' })).toEqual({ op: 'run', paths: [], what: 'npm test' })
   expect(touchOf('Grep', { pattern: 'login', path: '/p/src' })).toEqual({ op: 'search', paths: ['/p/src'], what: 'login' })
   expect(touchOf('Glob', { pattern: '**/*.ts' })).toEqual({ op: 'search', paths: [], what: '**/*.ts' })
-  expect(touchOf('WebFetch', { url: 'https://x.dev/a', prompt: 'summarize' })).toEqual({ op: 'web', paths: [], what: 'https://x.dev/a' })
+  expect(touchOf('WebFetch', { url: 'https://x.dev/a', prompt: 'summarize' })).toEqual({ op: 'web', paths: [], what: 'https://x.dev/a', links: ['https://x.dev/a'] })
   expect(touchOf('WebSearch', { query: 'tsc noEmit' })?.op).toBe('web')
   // Copilot's, which name and shape them differently.
   expect(touchOf('read_file', { filePath: '/p/a.ts', startLine: 1 })).toEqual({ op: 'read', paths: ['/p/a.ts'] })
@@ -776,6 +782,85 @@ test('what a call touched is read from its arguments, whatever the tool is calle
   // Nothing touched: no files, no command.
   expect(touchOf('TodoWrite', { todos: [{ content: 'x' }] })).toBeUndefined()
   expect(touchOf('Read', { file_path: 'a\nb' })).toBeUndefined()
+})
+
+test('the lines a call added and took out are read from its arguments', () => {
+  const changes = (tool: string, args: Record<string, unknown>) => touchOf(tool, args)?.changes
+  // An edit counts the lines that differ: what the two texts share at the start and the end is left out.
+  expect(changes('Edit', { file_path: '/p/a.ts', old_string: 'a\nb\nc', new_string: 'a\nB\nB2\nc' })).toEqual([
+    { path: '/p/a.ts', added: 2, removed: 1 },
+  ])
+  // A deletion, and an edit that changes nothing.
+  expect(changes('Edit', { file_path: '/p/a.ts', old_string: 'a\nb\n', new_string: '' })).toEqual([{ path: '/p/a.ts', added: 0, removed: 2 }])
+  expect(changes('Edit', { file_path: '/p/a.ts', old_string: 'x', new_string: 'x' })).toBeUndefined()
+  // A list of edits to one file.
+  expect(
+    changes('MultiEdit', { file_path: '/p/a.ts', edits: [{ old_string: 'a', new_string: 'b' }, { old_string: '', new_string: 'x\ny' }] }),
+  ).toEqual([{ path: '/p/a.ts', added: 3, removed: 1 }])
+  // A text written whole counts as added: the call does not say what was there.
+  expect(changes('Write', { file_path: '/p/n.ts', content: 'a\nb\nc\n' })).toEqual([{ path: '/p/n.ts', added: 3, removed: 0 }])
+  // Copilot's tools: a replacement per file, a created file, code inserted between "existing code" marks.
+  expect(
+    changes('multi_replace_string_in_file', {
+      replacements: [
+        { filePath: '/p/a.ts', oldString: 'x', newString: 'y\nz' },
+        { filePath: '/p/b.ts', oldString: 'q\nr', newString: '' },
+        { filePath: '/p/a.ts', oldString: 'm', newString: 'n' },
+      ],
+    }),
+  ).toEqual([
+    { path: '/p/a.ts', added: 3, removed: 2 },
+    { path: '/p/b.ts', added: 0, removed: 2 },
+  ])
+  expect(changes('create_file', { filePath: '/p/b.ts', content: 'one\ntwo' })).toEqual([{ path: '/p/b.ts', added: 2, removed: 0 }])
+  expect(
+    changes('insert_edit_into_file', { filePath: '/p/a.ts', code: '// ...existing code...\nconst x = 1\n// ...existing code...' }),
+  ).toEqual([{ path: '/p/a.ts', added: 1, removed: 0 }])
+  // A patch names its files itself.
+  const patch = touchOf('apply_patch', {
+    input: '*** Begin Patch\n*** Update File: /p/a.ts\n@@\n keep\n-old\n+new\n+more\n*** Add File: /p/c.ts\n+hello\n*** End Patch',
+  })
+  expect(patch?.paths).toEqual(['/p/a.ts', '/p/c.ts'])
+  expect(patch?.changes).toEqual([
+    { path: '/p/a.ts', added: 2, removed: 1 },
+    { path: '/p/c.ts', added: 1, removed: 0 },
+  ])
+  // A read has no lines to count.
+  expect(touchOf('Read', { file_path: '/p/a.ts' })?.changes).toBeUndefined()
+})
+
+test('the calls of a prompt, and the lines each and all of them added and took out', () => {
+  const top = { id: 'p', kind: 'prompt' as const, name: 'Prompt', arg: '', status: 'ok' as const, start: 0, end: 10_000 }
+  const call = (id: string, name: string, start: number, touch: any, over: object = {}) =>
+    ({ id, parent: 'p', kind: 'tool' as const, name, arg: '', status: 'ok' as const, start, end: start + 100, touch, ...over })
+  const edit = (path: string, added: number, removed: number) => ({ op: 'edit', paths: [path], changes: [{ path, added, removed }] })
+  const below = [
+    call('6', 'Read', 1000, { op: 'read', paths: ['/p/README.md'] }),
+    call('1', 'Edit', 0, edit('/p/src/pane/row.tsx', 10, 2)),
+    call('2', 'Edit', 200, edit('/p/src/pane/row.tsx', 3, 0)),
+    // A failed edit changed nothing.
+    call('3', 'Edit', 400, edit('/p/src/pane/row.tsx', 99, 99), { status: 'err' as const }),
+    call('4', 'Write', 600, { op: 'write', paths: ['/p/src/touch.ts'], changes: [{ path: '/p/src/touch.ts', added: 5, removed: 0 }] }),
+    call('5', 'MultiEdit', 800, {
+      op: 'edit',
+      paths: ['/p/a.ts', '/p/b.ts'],
+      changes: [
+        { path: '/p/a.ts', added: 1, removed: 1 },
+        { path: '/p/b.ts', added: 2, removed: 0 },
+      ],
+    }),
+    call('x', 'TodoWrite', 900, undefined),
+  ]
+  const t = touchedOf(top, below, 20_000)
+  // The calls that touched something, in the order they started.
+  expect(t.calls.map(n => n.id)).toEqual(['1', '2', '3', '4', '5', '6'])
+  expect(callLines(t.calls[0]!)).toEqual({ added: 10, removed: 2 })
+  expect(callLines(t.calls[2]!)).toEqual({ added: 0, removed: 0 })
+  expect(callLines(t.calls[4]!)).toEqual({ added: 3, removed: 1 })
+  // Each file, and all of them.
+  const row = t.files.find(f => f.path === '/p/src/pane/row.tsx')!
+  expect([row.added, row.removed]).toEqual([13, 2])
+  expect([t.added, t.removed]).toEqual([13 + 5 + 3, 2 + 1])
 })
 
 test('the files, commands and lookups of a prompt, with re-reads, retries, time and waits', () => {
@@ -818,13 +903,155 @@ test('the files, commands and lookups of a prompt, with re-reads, retries, time 
   expect(commonDir([])).toBe('')
 })
 
+test('a shell call is named by the program it runs, without the cd that only moves to a folder', () => {
+  expect(shellOf('cd /a/b && npm test')).toEqual({ program: 'npm', rest: 'test' })
+  expect(shellOf('cd "/a b" && git status; echo done')).toEqual({ program: 'git', rest: 'status; echo done' })
+  expect(shellOf('cd /a && cd b && ./scripts/run.sh --fast')).toEqual({ program: 'run.sh', rest: '--fast' })
+  expect(shellOf('FOO=1 BAR="x y" node app.js')).toEqual({ program: 'node', rest: 'app.js' })
+  expect(shellOf('/usr/bin/git log')).toEqual({ program: 'git', rest: 'log' })
+  expect(shellOf('ls')).toEqual({ program: 'ls', rest: '' })
+  // Nothing to name: the tool keeps its own.
+  for (const none of ['', '# only a comment', 'if true; then cd /a; fi', 'cd /a', 'cd /a && export A=1']) expect(shellOf(none)).toBeUndefined()
+  const call = (over: object) => ({ id: 't', kind: 'tool' as const, name: 'Bash', arg: 'cd /a && npm test', status: 'ok' as const, start: 0, ...over })
+  const sh = call({ touch: { op: 'run', paths: [], what: 'cd /a && npm test' } })
+  expect([toolName(sh), toolArg(sh)]).toEqual(['npm', 'test'])
+  // A line that runs no program of its own is called by its shell.
+  const odd = call({ touch: { op: 'run', paths: [], what: 'cd /a && export X=1' } })
+  expect([toolName(odd), toolArg(odd)]).toEqual(['bash', 'cd /a && npm test'])
+  expect(toolName(call({ name: 'PowerShell', touch: { op: 'run', paths: [], what: 'Set-Location C:\\p' } }))).toBe('pwsh')
+  expect(shellKind('run_in_terminal', 'Get-ChildItem -Recurse')).toBe('pwsh')
+  expect(toolName(call({ name: 'Edit', touch: { op: 'edit', paths: ['/a/b.ts'] } }))).toBe('Edit')
+  // The first command that is not a common call (cd, export, Set-Location...) names the line.
+  expect(shellOf('cd /a/b && sed -n 1p f | grep -E "Test"')?.program).toBe('sed')
+  expect(shellOf('export A=1; cd x; npm test')?.program).toBe('npm')
+  expect(shellOf('$env:FOO = "x"; Set-Location C:\\p; npm test')?.program).toBe('npm')
+  // A line is pipelines joined by && || ; &, and each of commands joined by |.
+  const shape = (c: string) => stepsOf(c).map(s => [s.join ?? '', ...s.stages.map(x => `${x.pipe ?? ''}${x.name}`)])
+  expect(shape('cd /a && sed -n 1p f | grep -E "Test"')).toEqual([['', 'cd'], ['&&', 'sed', '|grep']])
+  expect(shape('a || b; c & d')).toEqual([['', 'a'], ['||', 'b'], [';', 'c'], ['&', 'd']])
+  expect(shape('echo "a && b | c" && grep x $(ls | wc)')).toEqual([['', 'echo'], ['&&', 'grep']])
+  expect(sequenceOf(call({ touch: { op: 'run', paths: [], what: 'npm test' } })).length).toBe(0)
+  expect(sequenceOf(call({ touch: { op: 'run', paths: [], what: 'cd /a && npm test' } })).length).toBe(2)
+  // The glyphs: the terminal's prompt for a command, one each for read, edit, write; none for a call that is not mapped.
+  const op = (o: string) => glyph(call({ touch: { op: o, paths: [] } }))
+  expect([op('run'), op('read'), op('edit'), op('write')]).toEqual(['❯_', '≡', '✎', '✚'])
+  expect([op('other'), glyph(call({ name: 'TodoWrite' }))]).toEqual(['', ''])
+})
+
+test('the details of a shell call show its commands as a tree, and the row is named by the first that is not a cd', async ($, on) => {
+  quiet(on)
+  on('tool.call', () => ({ result: {}, text: 'ok' }))
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'go', turnId: 'sq' })
+  await $.tool.call({ tool: 'Bash', command: 'cd /p && sed -n 1p f | grep -E "Test" || echo none' } as never)
+  await $.turn.complete({ turnId: 'sq', reason: 'answer', answer: 'done' } as never)
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'view-tree' })
+  const row = await ui.find({ type: 'Button', text: /\bsed\b/ })
+  expect(row).toBeDefined()
+  await ui.press({ key: row?.key ?? '' })
+  expect(await ui.find({ type: 'Text', text: /^COMMANDS$/ })).toBeDefined()
+  // Each command by its name only, with its operator before it; the first is the cd.
+  const lines = (await ui.findAll({ type: 'Text' })).map(x => x.text ?? '').filter(x => /^[├└│ ]*─?\s?(&&|\|\||\|)?\s?(cd|sed|grep|echo)$/.test(x.trim()) || /(cd|sed|grep|echo)$/.test(x))
+  expect(lines.some(x => x.includes('cd'))).toBe(true)
+  expect(lines.some(x => x.includes('&& sed'))).toBe(true)
+  expect(lines.some(x => x.includes('| grep'))).toBe(true)
+  expect(lines.some(x => x.includes('|| echo'))).toBe(true)
+  expect(await ui.find({ type: 'Text', text: /&& runs the next only if this succeeded · \| feeds this one's output to the next · \|\| runs the next only if this failed/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a call shows what it involved under its row, in the tree and the waterfall, and a click opens the details', async ($, on) => {
+  quiet(on)
+  on('tool.call', () => ({ result: {}, text: 'ok' }))
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'look into login', turnId: 'tr' })
+  await $.tool.call({ tool: 'Read', file_path: '/p/src/login.ts' } as never)
+  await $.tool.call({ tool: 'Edit', file_path: '/p/src/login.ts', old_string: 'a', new_string: 'b\nc' } as never)
+  await $.tool.call({ tool: 'WebFetch', url: 'https://x.dev/docs/auth', prompt: 'summarize' } as never)
+  await $.tool.call({ tool: 'Bash', command: 'npm test' } as never)
+  await $.turn.complete({ turnId: 'tr', reason: 'answer', answer: 'done' } as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const involved = async () => (await ui.findAll({ type: 'Button' })).filter(b => b.key?.startsWith('open:res:'))
+  await ui.press({ key: 'view-tree' })
+  // What a call involved is shut until it is opened: each call with something has an arrow, and nothing under it.
+  expect(await involved()).toEqual([])
+  const arrows = (await ui.findAll({ type: 'Button' })).filter(b => b.key?.startsWith('fold:open:'))
+  expect(arrows.length).toBe(4)
+  expect(arrows.every(b => b.text?.startsWith('▸'))).toBe(true)
+  // Each call opens on its own.
+  await ui.press({ key: arrows[2]?.key ?? '' })
+  expect((await involved()).map(b => b.text)).toEqual(['↗ x.dev/docs/auth fetch'])
+  for (const a of [arrows[0], arrows[1], arrows[3]]) await ui.press({ key: a?.key ?? '' })
+  for (const view of ['view-tree', 'view-waterfall']) {
+    await ui.press({ key: view })
+    // A file is shown by its name only, with what was done to it; an address without its scheme; a command whole.
+    expect((await ui.findAll({ type: 'Button' })).filter(b => /^◦ login\.ts (read|edit)/.test(b.text ?? '')).map(b => b.text)).toEqual([
+      '◦ login.ts read',
+      '◦ login.ts edit +2 −1',
+    ])
+    expect(await ui.find({ type: 'Button', text: /^↗ x\.dev\/docs\/auth fetch$/ })).toBeDefined()
+    expect(await ui.find({ type: 'Button', text: /^\$ npm test run$/ })).toBeDefined()
+  }
+
+  // A click on the file shows its whole path and every call of the prompt that involved it.
+  const file = await ui.find({ type: 'Button', text: /^◦ login\.ts edit/ })
+  await ui.press({ key: file?.key ?? '' })
+  expect(await ui.find({ type: 'Text', text: /^\/p\/src\/login\.ts$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /2 calls in this prompt/ })).toBeDefined()
+  expect(await ui.find({ type: 'Button', text: /^Read \d+ms$/ })).toBeDefined()
+  // The address shows whole too.
+  const link = await ui.find({ type: 'Button', text: /^↗ x\.dev/ })
+  await ui.press({ key: link?.key ?? '' })
+  expect(await ui.find({ type: 'Text', text: /^https:\/\/x\.dev\/docs\/auth$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /address · fetch by WebFetch/ })).toBeDefined()
+  await ui.press({ key: 'close' })
+
+  // The arrow shuts them again.
+  await ui.press({ key: arrows[2]?.key ?? '' })
+  expect((await involved()).some(b => b.text?.startsWith('↗'))).toBe(false)
+  await ui.unmount()
+})
+
+test('the Touched view is a tree of the tool calls, each with the files it touched and its lines', async ($, on) => {
+  quiet(on)
+  on('tool.call', () => ({ result: {}, text: 'ok' }))
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'refactor', turnId: 'tt' })
+  await $.tool.call({ tool: 'Edit', file_path: '/p/src/pane/row.tsx', old_string: 'a', new_string: 'b\nc\nd' } as never)
+  await $.tool.call({ tool: 'Write', file_path: '/p/src/pane/bar.tsx', content: 'x\ny' } as never)
+  await $.tool.call({ tool: 'Edit', file_path: '/p/src/pane/row.tsx', old_string: 'b\nc\nd', new_string: 'b' } as never)
+  await $.turn.complete({ turnId: 'tt', reason: 'answer', answer: 'done' } as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  await ui.press({ key: 'view-files' })
+  expect(await ui.find({ type: 'Text', text: /^CALLS · under …\/p\/src\/pane$/ })).toBeDefined()
+  // The three calls, in order, as buttons; each shows its file under it, with the lines of that call.
+  const calls = (await ui.findAll({ type: 'Button' })).filter(b => b.key?.startsWith('pick:'))
+  expect(calls.map(b => b.text?.replace(/ \d+ms$/, ''))).toEqual(['Edit', 'Write', 'Edit'])
+  const files = (await ui.findAll({ type: 'Text' })).filter(x => /^(row|bar)\.tsx$/.test(x.text ?? ''))
+  // Under the calls (three) and in the summary of files (two).
+  expect(files.map(x => x.text)).toEqual(['row.tsx', 'bar.tsx', 'row.tsx', 'row.tsx', 'bar.tsx'])
+  const added = (await ui.findAll({ type: 'Text' })).map(x => x.text).filter(x => /^\+\d+$/.test(x ?? ''))
+  // Call lines: +3, +2, and none to show for the last (it only took lines out).
+  expect(added).toContain('+3')
+  expect(added).toContain('+2')
+  // The summary of each file and the total of all.
+  expect(await ui.find({ type: 'Text', text: /^FILES · under …\/p\/src\/pane$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^Total$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^2 files · 2 changed$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /\+5 −3 lines/ })).toBeDefined()
+  await ui.unmount()
+})
+
 test('the Touched view lists files, commands and lookups, and a call opens its details', async ($, on) => {
   quiet(on)
   on('tool.call', () => ({ result: {}, text: 'ok' }))
   await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
   await $.turn.start({ text: 'fix login', turnId: 'tv' })
   await $.tool.call({ tool: 'Read', file_path: '/p/src/login.ts' } as never)
-  await $.tool.call({ tool: 'Edit', file_path: '/p/src/login.ts', old_string: 'a', new_string: 'b' } as never)
+  await $.tool.call({ tool: 'Edit', file_path: '/p/src/login.ts', old_string: 'a', new_string: 'b\nc' } as never)
   await $.tool.call({ tool: 'Read', file_path: '/p/src/util.ts' } as never)
   await $.tool.call({ tool: 'Bash', command: 'npm test' } as never)
   await $.tool.call({ tool: 'Grep', pattern: 'login', path: '/p' } as never)
@@ -832,17 +1059,22 @@ test('the Touched view lists files, commands and lookups, and a call opens its d
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   await ui.press({ key: 'view-files' })
-  expect(await ui.find({ type: 'Text', text: /2 files \(1 changed, 1 read only\) · 1 command · 1 lookup/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /2 files \(1 changed, 1 read only\) · \+2 −1 lines · 1 command · 1 lookup/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /calls ran .* of .* · model and other time/ })).toBeDefined()
   // Paths are shown under the directory they share.
   expect(await ui.find({ type: 'Text', text: /^FILES · under …\/p\/src/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^login\.ts$/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^R1 E1$/ })).toBeDefined()
+  // The lines of the edit, on its call and on the file; and the total of all the files.
+  expect(await ui.find({ type: 'Text', text: /^\+2$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^−1$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^Total$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^2 files · 1 changed$/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^util\.ts$/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /^COMMANDS/ })).toBeDefined()
+  // A command and a lookup are calls too, with what they ran or looked for beside the tool.
+  expect(await ui.find({ type: 'Text', text: /^CALLS/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /^npm test$/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /^LOOKUPS/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /^Grep login$/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^login$/ })).toBeDefined()
 
   // The calls that touched login.ts are buttons: Read, then Edit.
   const calls = (await ui.findAll({ type: 'Button' })).filter(b => b.key?.startsWith('pick:'))

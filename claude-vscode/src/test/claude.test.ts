@@ -313,3 +313,118 @@ test('the Touched view counts the wait apart from the model and other time', () 
   assert.match(html, /waited on you 4\.7s/)
   assert.match(html, /tag warn[^>]*>asked, waited 4\.7s/)
 })
+
+test('the Touched view is a tree of the tool calls, each with the files it touched and its lines, then a summary of files and the total', () => {
+  const s = run(
+    ev(10, { kind: 'prompt', arg: 'refactor' }),
+    ev(20, { kind: 'tool_pre', tool: 'Edit', toolUseId: 'e1', arg: '', touch: { op: 'edit', paths: ['/p/src/pane/row.tsx'], changes: [{ path: '/p/src/pane/row.tsx', added: 10, removed: 2 }] } }),
+    ev(30, { kind: 'tool_post', tool: 'Edit', toolUseId: 'e1', output: 'ok' }),
+    ev(40, { kind: 'tool_pre', tool: 'Edit', toolUseId: 'e2', arg: '', touch: { op: 'edit', paths: ['/p/src/pane/row.tsx'], changes: [{ path: '/p/src/pane/row.tsx', added: 3, removed: 0 }] } }),
+    ev(50, { kind: 'tool_post', tool: 'Edit', toolUseId: 'e2', output: 'ok' }),
+    ev(60, { kind: 'tool_pre', tool: 'Edit', toolUseId: 'e3', arg: '', touch: { op: 'edit', paths: ['/p/src/pane/row.tsx'], changes: [{ path: '/p/src/pane/row.tsx', added: 99, removed: 99 }] } }),
+    ev(70, { kind: 'tool_fail', tool: 'Edit', toolUseId: 'e3', output: 'ok' }),
+    ev(80, { kind: 'tool_pre', tool: 'Write', toolUseId: 'w1', arg: '', touch: { op: 'write', paths: ['/p/src/touch.ts'], changes: [{ path: '/p/src/touch.ts', added: 5, removed: 0 }] } }),
+    ev(90, { kind: 'tool_post', tool: 'Write', toolUseId: 'w1', output: 'ok' }),
+    ev(100, { kind: 'tool_pre', tool: 'MultiEdit', toolUseId: 'm1', arg: '', touch: { op: 'edit', paths: ['/p/src/a.ts', '/p/src/b.ts'], changes: [{ path: '/p/src/a.ts', added: 1, removed: 1 }, { path: '/p/src/b.ts', added: 2, removed: 0 }] } }),
+    ev(110, { kind: 'tool_post', tool: 'MultiEdit', toolUseId: 'm1', output: 'ok' }),
+    ev(120, { kind: 'tool_pre', tool: 'Read', toolUseId: 'r1', arg: '', touch: { op: 'read', paths: ['/p/src/pane/bar.tsx'] } }),
+    ev(130, { kind: 'tool_post', tool: 'Read', toolUseId: 'r1', output: 'ok' }),
+    ev(140, { kind: 'tool_pre', tool: 'Bash', toolUseId: 'c1', arg: '', touch: { op: 'run', paths: [], what: 'npm test' } }),
+    ev(150, { kind: 'tool_post', tool: 'Bash', toolUseId: 'c1', output: 'ok' }),
+    ev(160, { kind: 'stop' }),
+  )
+  const html = renderBody(s, view({ mode: 'files' }))
+  // The calls in the order they ran, each with its file under it.
+  assert.match(html, /CALLS · under …\/p\/src/)
+  assert.match(
+    html,
+    /tv-call[^>]*>Edit [^<]*<\/button>[\s\S]*?<bdi>pane\/row\.tsx<\/bdi>[\s\S]*?tv-add">\+10<[\s\S]*?tv-del">−2<[\s\S]*?tv-call[^>]*>Edit [^<]*<\/button>[\s\S]*?tv-add">\+3<[\s\S]*?tv-call[^>]*>Edit [^<]*✗<\/button>[\s\S]*?tv-call[^>]*>Write [^<]*<\/button>[\s\S]*?<bdi>touch\.ts<\/bdi>[\s\S]*?tv-add">\+5<[\s\S]*?tv-call[^>]*>Read /,
+  )
+  // A failed edit changed nothing: its file shows no lines.
+  assert.doesNotMatch(html, /\+99/)
+  // A call that touched several files sums them on its own row.
+  assert.match(html, /tv-call[^>]*>MultiEdit [^<]*<\/button>\s*\n?\s*<span class="tv-delta"[^>]*><span class="tv-add">\+3<\/span> <span class="tv-del">−1</)
+  // The summary of each file, and the total of all.
+  assert.match(html, /FILES · under …\/p\/src/)
+  assert.match(html, /<bdi>pane\/row\.tsx<\/bdi>[^]*?E3[^]*?tv-add">\+13<[^]*?tv-del">−2</)
+  assert.match(html, /\+21 −3 lines/)
+  assert.match(html, /<b>Total<\/b>[^]*?5 files · 4 changed[^]*?tv-add">\+21<[^]*?tv-del">−3</)
+  // A command is a call too, with what it ran.
+  assert.match(html, /tv-call[^>]*>npm [^<]*<\/button>[^]*?mono[^>]*>npm test</)
+  assert.doesNotMatch(html, /COMMANDS|LOOKUPS/)
+})
+
+test('a call shows what it involved under its row, in the tree and the waterfall, and a click opens the details', () => {
+  const s = run(
+    ev(10, { kind: 'prompt', arg: 'look into login' }),
+    ev(20, { kind: 'tool_pre', tool: 'Read', toolUseId: 'r1', arg: '', touch: { op: 'read', paths: ['/p/src/login.ts'] } }),
+    ev(30, { kind: 'tool_post', tool: 'Read', toolUseId: 'r1', output: 'ok' }),
+    ev(40, { kind: 'tool_pre', tool: 'Edit', toolUseId: 'e1', arg: '', touch: { op: 'edit', paths: ['/p/src/login.ts'], changes: [{ path: '/p/src/login.ts', added: 2, removed: 1 }] } }),
+    ev(50, { kind: 'tool_post', tool: 'Edit', toolUseId: 'e1', output: 'ok' }),
+    ev(60, { kind: 'tool_pre', tool: 'WebFetch', toolUseId: 'w1', arg: '', touch: { op: 'web', paths: [], what: 'https://x.dev/docs/auth', links: ['https://x.dev/docs/auth'] } }),
+    ev(70, { kind: 'tool_post', tool: 'WebFetch', toolUseId: 'w1', output: 'ok' }),
+    ev(80, { kind: 'tool_pre', tool: 'Bash', toolUseId: 'c1', arg: '', touch: { op: 'run', paths: [], what: 'npm test' } }),
+    ev(90, { kind: 'tool_post', tool: 'Bash', toolUseId: 'c1', output: 'ok' }),
+    ev(100, { kind: 'stop' }),
+  )
+  const edit = s.nodes.find(n => n.name === 'Edit')!
+  // What a call involved is shut until it is opened: the call has an arrow, and nothing under it.
+  const shut = renderBody(s, view())
+  assert.doesNotMatch(shut, /class="row res/)
+  assert.match(shut, new RegExp(`data-act="fold" data-id="open:${edit.id.replace(/[#:]/g, '.')}"[^>]*>▸<`))
+  assert.match(shut, /<span class="dim">\+1<\/span>/)
+  const open = new Set(s.nodes.map(n => `open:${n.id}`))
+  for (const mode of ['tree', 'waterfall'] as const) {
+    const html = renderBody(s, view({ mode, folded: open }))
+    // A file is shown by its name only, with what was done to it and its lines; an address without its scheme; a command whole.
+    assert.match(html, /class="row res"[^]*?res-name">login\.ts<\/span>\s*<span class="dim">read</)
+    assert.match(html, new RegExp(`data-act="select" data-id="res:${edit.id.replace(/[#:]/g, '.')}:0"[^>]*>[^]*?res-name">login\\.ts</span>\\s*<span class="dim">edit</span><span class="tv-delta"[^>]*><span class="tv-add">\\+2</span> <span class="tv-del">−1<`))
+    assert.match(html, /res-name">x\.dev\/docs\/auth<\/span>\s*<span class="dim">fetch</)
+    assert.match(html, /res-name mono">npm test<\/span>\s*<span class="dim">run</)
+  }
+  // A click on the file shows its whole path, the calls that involved it, and a way to the call.
+  const modalHtml = renderBody(s, view({ selected: `res:${edit.id}:0` }))
+  assert.match(modalHtml, /class="modal-arg">\/p\/src\/login\.ts</)
+  assert.match(modalHtml, /file · edit by Edit/)
+  assert.match(modalHtml, /2 calls in this prompt · in all/)
+  assert.match(modalHtml, /data-act="select" data-id="[^"]+">Read /)
+  assert.ok(modalHtml.includes(`data-act="select" data-id="${edit.id}">Open the call<`))
+  // An address shows whole.
+  const web = s.nodes.find(n => n.name === 'WebFetch')!
+  const link = renderBody(s, view({ selected: `res:${web.id}:0` }))
+  assert.match(link, /class="modal-arg">https:\/\/x\.dev\/docs\/auth</)
+  assert.match(link, /address · fetch by WebFetch/)
+  // Each call opens on its own.
+  const one = renderBody(s, view({ folded: new Set([`open:${web.id}`]) }))
+  assert.doesNotMatch(one, /res-name">login/)
+  assert.match(one, /res-name">x\.dev/)
+  assert.match(one, new RegExp(`data-id="open:${web.id.replace(/[#:]/g, '.')}"[^>]*>▾<`))
+})
+
+test('the details of a shell call show its commands as a tree, each joined by its own operator', () => {
+  const s = run(
+    ev(10, { kind: 'prompt', arg: 'go' }),
+    ev(20, { kind: 'tool_pre', tool: 'Bash', toolUseId: 'b1', arg: 'x', touch: { op: 'run', paths: [], what: 'cd /p && sed -n 1p f | grep -E "Test" || echo none; ls' } }),
+    ev(30, { kind: 'tool_post', tool: 'Bash', toolUseId: 'b1', output: 'ok' }),
+    ev(40, { kind: 'tool_pre', tool: 'Bash', toolUseId: 'b2', arg: 'y', touch: { op: 'run', paths: [], what: 'npm test' } }),
+    ev(50, { kind: 'tool_post', tool: 'Bash', toolUseId: 'b2', output: 'ok' }),
+    ev(60, { kind: 'stop' }),
+  )
+  const chain = s.nodes.find(n => n.arg === 'x')!
+  // The row is named by the first command that is not a cd.
+  const rows = renderBody(s, view())
+  assert.match(rows, /<span class="strong">sed<\/span>|<span class="">sed<\/span>/)
+  const html = renderBody(s, view({ selected: chain.id }))
+  assert.match(html, /class="seq"/)
+  // cd (dim, a common call), then && sed with | grep under it, then || echo, then ; ls.
+  assert.match(html, /<span class="dim">cd<\/span>/)
+  assert.match(html, /<b class="op op-and"[^>]*>&amp;&amp;<\/b> <span class="">sed<\/span>/)
+  assert.match(html, /└─ <\/span><b class="op op-pipe"[^>]*>\|<\/b> <span class="">grep<\/span>/)
+  assert.match(html, /<b class="op op-or"[^>]*>\|\|<\/b> <span class="">echo<\/span>/)
+  assert.match(html, /<b class="op op-seq"[^>]*>;<\/b> <span class="">ls<\/span>/)
+  // What each operator means, for the ones used.
+  assert.match(html, /seq-legend[^]*runs the next only if this succeeded[^]*feeds this one&#39;s output to the next/)
+  // A line of one command has no tree.
+  const single = s.nodes.find(n => n.arg === 'y')!
+  assert.doesNotMatch(renderBody(s, view({ selected: single.id })), /class="seq"/)
+})

@@ -2,6 +2,7 @@ import type { EngineInterface } from 'claude-code'
 
 import type { Node } from '../../types'
 import { dur } from '../format'
+import { MAX_RESOURCES, openId, resourcesOf, type Resource } from '../resources'
 import { cellsOf } from './cells'
 import type { Lane, Pane, Place, Section } from './context'
 import { report } from './report'
@@ -22,21 +23,32 @@ export function section($: EngineInterface, c: Pane, top: Node) {
   const rows: Place[] = []
   const walk = (n: Node, depth: number, trail: Lane[], isLast: boolean) => {
     const isFolded = c.fold.has(n.id)
-    rows.push({ node: n, depth, hidden: isFolded ? c.below(n).length : 0, trail, isLast })
+    // What a call involved stays shut until the person opens it.
+    const res = c.fold.has(openId(n.id)) ? resourcesOf(n) : []
+    const shut = res.length === 0 ? resourcesOf(n).length : 0
+    rows.push({ node: n, depth, hidden: isFolded ? c.below(n).length : shut, trail, isLast })
     if (isFolded) return
     const sibs = c.kids.get(n.id) ?? []
     const next = depth === 0 ? [] : [...trail, { last: isLast }]
+    // What the call involved comes first, then what it started.
+    const shown: Resource[] = res.slice(0, MAX_RESOURCES)
+    if (res.length > shown.length) {
+      shown.push({ id: `more:${n.id}`, kind: 'more', label: `+${res.length - shown.length} more`, full: '', op: '', added: 0, removed: 0 })
+    }
+    shown.forEach((r, i) => rows.push({ node: n, res: r, depth: depth + 1, hidden: 0, trail: next, isLast: sibs.length === 0 && i === shown.length - 1 }))
     sibs.forEach((k, i) => walk(k, depth + 1, next, i === sibs.length - 1))
   }
   walk(top, 0, [], true)
 
   // The right-hand cells of every row, measured, so that the columns line up.
-  const cells = rows.map(r => cellsOf(c, r.node))
+  const own = rows.filter(r => !r.res)
+  const cells = own.map(r => cellsOf(c, r.node))
   const s: Section = {
+    top,
     t0,
     t1,
     slowest,
-    rowCount: rows.length,
+    rowCount: own.length,
     tokW: Math.max(0, ...cells.map(x => x.out.length)),
     timeW: Math.max(0, ...cells.map(x => x.right.length)),
   }

@@ -1,6 +1,6 @@
 import type { Session } from '../model'
 import { index, makeCtx } from './context'
-import { modal } from './modal'
+import { modal, resourceModal } from './modal'
 import { section } from './rows'
 import { touchedView } from './touched'
 import { empty, picker, summary, toolbar } from './toolbar'
@@ -23,6 +23,7 @@ export const renderBody = (s: Session | undefined, v: View): string => {
   }
   const c = makeCtx(s, v)
   const picked = v.selected ? c.byId.get(v.selected) : undefined
+  const pickedRes = v.selected ? c.resById.get(v.selected) : undefined
   return [
     toolbar(c),
     summary(c),
@@ -30,7 +31,7 @@ export const renderBody = (s: Session | undefined, v: View): string => {
       .reverse()
       .map((top, i) => `${i > 0 ? '<hr>' : ''}${c.isFiles ? touchedView(c, top) : section(c, top)}`)
       .join(''),
-    picked ? modal(c, picked) : '',
+    picked ? modal(c, picked) : pickedRes ? resourceModal(c, pickedRes.node, pickedRes.res) : '',
   ].join('\n')
 }
 

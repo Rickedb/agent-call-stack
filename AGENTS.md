@@ -14,7 +14,7 @@ How data is shown depends on the agent's surface, so each agent keeps its presen
 
 | Agent | Presentation files | How a row's details show |
 | --- | --- | --- |
-| Claude Code | `claude/src/pane/` (`row`, `section`, `bar`, `details`, `block`, `report`, `touched`, `toolbar`, `widget`, `theme`, ...) | inline, under the row |
+| Claude Code | `claude/src/pane/` (`row`, `section`, `bar`, `details`, `block`, `report`, `resource`, `touched`, `toolbar`, `widget`, `theme`, ...) | inline, under the row |
 | GitHub Copilot in VS Code | `vscode/src/view/` (`rows`, `modal`, `blocks`, `report`, `touched`, `toolbar`, `text`, `format`, `context`, ...), drawn by `vscode/media/` | in a modal over the view |
 | Claude Code in VS Code | `claude-vscode/src/view/` (the same files, less `text`, plus `tags`), drawn by `claude-vscode/media/` | in a modal over the view |
 

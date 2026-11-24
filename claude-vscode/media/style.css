@@ -137,3 +137,20 @@ hr { border: 0; border-top: 1px solid var(--vscode-panel-border); margin: 12px 0
 .tv-call { padding: 0; background: none; border-radius: 2px; }
 .tv-call:hover { text-decoration: underline; }
 .tv-call.sel { font-weight: 600; }
+.row.res .label { gap: 5px; }
+.res-name.mono { font-family: var(--vscode-editor-font-family, monospace); overflow: hidden; text-overflow: ellipsis; }
+.seq { display: flex; flex-direction: column; gap: 1px; margin: 6px 0; }
+.seq-line { font-family: var(--vscode-editor-font-family, monospace); white-space: pre; }
+.seq-legend { font-size: .92em; }
+.op { font-weight: 700; }
+.op-and { color: var(--c-tool); }
+.op-or { color: var(--c-run); }
+.op-pipe { color: var(--c-agent); }
+.op-seq { color: var(--vscode-descriptionForeground); }
+.tv-tree { display: flex; flex-direction: column; gap: 2px; }
+.tv-node { display: flex; flex-direction: column; gap: 2px; }
+.tv-kids { display: flex; flex-direction: column; gap: 2px; margin-left: 6px; padding-left: 10px; border-left: 1px solid var(--vscode-tree-indentGuidesStroke, color-mix(in srgb, var(--vscode-foreground) 25%, transparent)); }
+.tv-delta { flex: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tv-add { color: var(--c-tool); }
+.tv-del { color: var(--c-err); }
+.tv-total { padding-top: 4px; margin-top: 2px; border-top: 1px solid color-mix(in srgb, var(--vscode-foreground) 20%, transparent); }

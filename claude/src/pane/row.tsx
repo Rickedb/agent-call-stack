@@ -6,15 +6,23 @@ import { bar } from './bar'
 import { cellsOf, WIDE } from './cells'
 import type { Pane, Place, Section } from './context'
 import { details } from './details'
+import { openId, resourcesOf } from '../resources'
+import { resourceRow } from './resource'
 import { tagOf } from './tags'
-import { mark, tint } from './theme'
+import { toolArg, toolName } from '../names'
+import { glyph, mark, tint } from './theme'
 
 // One row: the tree guides and fold arrow, a status glyph, name and argument,
 // then (to the right, in columns) its output's size and its time; the bar under it in the waterfall; its details when picked.
 export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
   const { Box, Text, Button } = c.els
   const { node, depth, hidden, trail, isLast } = place
+  if (place.res) return resourceRow($, c, s, place)
   const hasKids = (c.kids.get(node.id) ?? []).length > 0
+  // The arrow folds the call's children; a call with only things it involved opens and shuts those.
+  const hasRes = !hasKids && resourcesOf(node).length > 0
+  const arrowId = hasRes ? openId(node.id) : node.id
+  const isShut = hasRes ? !c.fold.has(arrowId) : c.fold.has(arrowId)
   const isPicked = node.id === c.pick
   const { right, out } = cellsOf(c, node)
 
@@ -22,8 +30,9 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
   // The tree says every status with a glyph. The waterfall's bar color already says it, so only
   // a failure gets one there, after the name.
   const isFailed = node.status === 'err'
-  const markW = c.isWaterfall ? (isFailed ? 2 : 0) : 2
-  const name = node.kind === 'prompt' ? `Prompt ${c.promptNo.get(node.id)}` : node.name
+  const icon = glyph(node)
+  const markW = (c.isWaterfall ? (isFailed ? 2 : 0) : 2) + (icon ? icon.length + 1 : 0)
+  const name = node.kind === 'prompt' ? `Prompt ${c.promptNo.get(node.id)}` : toolName(node)
   const own = isLast ? '└─' : '├─'
   const isSlowest = node === s.slowest && s.rowCount > 3 && c.cols >= WIDE
 
@@ -36,7 +45,7 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
     c.cols - lead - markW - (isSlowest ? 8 : 0) - tokCol - timeCol - barCol - 1
   const model = node.model ? modelName(node.model) : ''
   const tag = tagOf(node)
-  const arg = clip(node.arg, room - name.length - (model ? model.length + 1 : 0) - (tag ? tag.text.length + 1 : 0) - 1)
+  const arg = clip(toolArg(node), room - name.length - (model ? model.length + 1 : 0) - (tag ? tag.text.length + 1 : 0) - 1)
 
   return (
     <Box flexDirection="column">
@@ -53,14 +62,14 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
                 {own}
               </Text>
             ) : null}
-            {hasKids ? (
+            {hasKids || hasRes ? (
               <Button
-                key={`fold:${node.id}`}
+                key={`fold:${arrowId}`}
                 plain
                 dimColor
-                onPress={() => void toggleFolded($, node.id)}
+                onPress={() => void toggleFolded($, arrowId)}
               >
-                {`${c.fold.has(node.id) ? '▸' : '▾'} `}
+                {`${isShut ? '▸' : '▾'} `}
               </Button>
             ) : (
               <Text> </Text>
@@ -69,6 +78,7 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
           <Box flexGrow={1} flexShrink={1} overflow="hidden">
             <Button key={`open:${node.id}`} plain onPress={() => void toggleSelected($, node.id)}>
               {c.isWaterfall ? null : <Text color={tint(node)}>{mark(node)} </Text>}
+              {icon ? <Text dimColor>{`${icon} `}</Text> : null}
               <Text bold={isPicked || (node.kind !== 'tool' && node.kind !== 'event')} wrap="truncate-end">
                 {name}
               </Text>

@@ -1,4 +1,5 @@
 import type { Node } from '../types'
+import { toolOp } from '../names'
 
 export const esc = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
@@ -45,8 +46,17 @@ export const tokText = (n: Node, which: 'input' | 'output'): string => {
 }
 
 const KIND_ICON = { prompt: '💬', agent: '🤖', tool: '🔧' } as const
+// What a tool call did, when it is known: a shell command has the terminal's prompt, a file call the
+// icon of reading, editing or writing. Any other call keeps the tool's own.
+const TOOL_ICON: Record<string, string> = { run: '❯_', read: '📖', edit: '✏️', write: '📝', search: '🔍', web: '🌐' }
 export const icon = (n: Node): string =>
-  n.kind === 'event' ? (n.name === 'Compact' ? '🗜️' : '⚠️') : KIND_ICON[n.kind]
+  n.kind === 'event'
+    ? n.name === 'Compact'
+      ? '🗜️'
+      : '⚠️'
+    : n.kind === 'tool'
+      ? (TOOL_ICON[toolOp(n) ?? ''] ?? KIND_ICON.tool)
+      : KIND_ICON[n.kind]
 export const mark = (n: Node): string => (n.status === 'run' ? '●' : n.status === 'ok' ? '✓' : '✗')
 export const statusWord = (n: Node): string => (n.status === 'run' ? 'Running' : n.status === 'ok' ? 'Done' : 'Failed')
 
@@ -63,6 +73,15 @@ export const tint = (n: Node): string =>
           : 'tool'
 
 export const span = (n: Node, now: number): number => (n.end ?? now) - n.start
+
+// Lines added and taken out: nothing when neither.
+export const delta = (added: number, removed: number): string =>
+  added || removed
+    ? `<span class="tv-delta" title="Lines added and taken out, from the call's arguments"><span class="tv-add">+${added}</span> <span class="tv-del">−${removed}</span></span>`
+    : ''
+
+// A glyph for each kind of thing a call involved.
+export const RES_GLYPH = { file: '◦', link: '↗', command: '$', query: '?', more: '' } as const
 
 export const button = (act: string, label: string, attrs = '', cls = ''): string =>
   `<button class="btn ${cls}" data-act="${act}" ${attrs}>${label}</button>`
