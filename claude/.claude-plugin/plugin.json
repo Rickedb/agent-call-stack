@@ -2,6 +2,12 @@
   "name": "agent-call-stack",
   "version": "0.1.0",
   "description": "A live pane beside the chat that shows what Claude is doing as a call stack: prompts, the model's thinking and replies, subagents and tool calls, as a tree or a waterfall with status, duration, models, tokens, approvals, errors and compactions.",
+  "author": {
+    "name": "Henrique Dal Bello",
+    "url": "https://github.com/Rickedb"
+  },
+  "homepage": "https://github.com/Rickedb/agent-call-stack#readme",
+  "repository": "https://github.com/Rickedb/agent-call-stack",
   "types": "./types/index.d.ts",
   "license": "MIT"
 }

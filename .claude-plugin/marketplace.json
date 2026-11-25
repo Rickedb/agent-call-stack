@@ -3,6 +3,7 @@
   "owner": {
     "name": "rickedb"
   },
+  "description": "Agent Call Stack: a live pane that shows what Claude Code is doing as a call stack, with its prompts, subagents, tool calls, timings and tokens.",
   "plugins": [
     {
       "name": "agent-call-stack",
