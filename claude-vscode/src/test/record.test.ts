@@ -101,7 +101,7 @@ test('what a call touched is read from its arguments, whatever the tool is calle
 })
 
 test('long texts are cut in the log and kept whole in a file', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'call-tree-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'call-stack-'))
   const ev = spill({ v: 1, t: 5, sid: 's', kind: 'tool_post', output: 'x'.repeat(KEEP + 500) }, dir)
   assert.equal(ev.output?.length, KEEP)
   assert.equal(ev.outputLen, KEEP + 500)
@@ -110,12 +110,12 @@ test('long texts are cut in the log and kept whole in a file', () => {
 })
 
 test('the script appends one line per event and prints nothing, so the work goes on as it would have', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'call-tree-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'call-stack-'))
   const script = path.join(__dirname, '..', 'record.js')
   const run = (event: string, payload: object | string) =>
     spawnSync(process.execPath, [script, event], {
       input: typeof payload === 'string' ? payload : JSON.stringify(payload),
-      env: { ...process.env, AI_CALL_STACK_CLAUDE_DIR: dir },
+      env: { ...process.env, AGENT_CALL_STACK_CLAUDE_DIR: dir },
       encoding: 'utf8',
     })
   const a = run('UserPromptSubmit', { ...base, prompt: 'hi' })

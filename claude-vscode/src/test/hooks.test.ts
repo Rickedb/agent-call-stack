@@ -5,6 +5,8 @@ import * as path from 'node:path'
 import { test } from 'node:test'
 
 import {
+  commandFor,
+  runtime,
   EVENTS,
   hasHooks,
   hooksDisabled,
@@ -20,8 +22,8 @@ import {
   withoutHooks,
 } from '../hooks'
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'call-tree-'))
-const REC = '/home/u/.claude/ai-call-stack-vscode/record.cjs'
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'call-stack-'))
+const REC = '/home/u/.claude/agent-call-stack-vscode/record.cjs'
 
 test('our hooks are added for every event, and what else the settings hold is left alone', () => {
   const mine = {
@@ -55,7 +57,7 @@ test('adding twice adds nothing more, and removing leaves the settings as they w
   // Only ours: `hooks` goes with them.
   assert.deepEqual(withoutHooks(withHooks({ theme: 'dark' }, REC)), { theme: 'dark' })
   // A moved recorder replaces the old entries, it does not add to them.
-  const moved = withHooks(once, '/other/.claude/ai-call-stack-vscode/record.cjs') as { hooks: Record<string, unknown[]> }
+  const moved = withHooks(once, '/other/.claude/agent-call-stack-vscode/record.cjs') as { hooks: Record<string, unknown[]> }
   assert.equal(moved.hooks.Stop?.length, 2)
   assert.match(JSON.stringify(moved), /other/)
   assert.doesNotMatch(JSON.stringify(moved), /home\/u/)
@@ -67,10 +69,10 @@ test('the file is written with a backup of what it was, once, and removed cleanl
   fs.writeFileSync(file, JSON.stringify({ theme: 'dark' }, null, 2))
   installHookFile(file, REC)
   assert.equal(hooksInstalledIn(file), true)
-  assert.deepEqual(JSON.parse(fs.readFileSync(`${file}.ai-call-stack.bak`, 'utf8')), { theme: 'dark' })
+  assert.deepEqual(JSON.parse(fs.readFileSync(`${file}.agent-call-stack.bak`, 'utf8')), { theme: 'dark' })
   installHookFile(file, REC)
   // The backup stays what the person had, not what we wrote first.
-  assert.deepEqual(JSON.parse(fs.readFileSync(`${file}.ai-call-stack.bak`, 'utf8')), { theme: 'dark' })
+  assert.deepEqual(JSON.parse(fs.readFileSync(`${file}.agent-call-stack.bak`, 'utf8')), { theme: 'dark' })
   assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).theme, 'dark')
 
   assert.equal(removeHookFile(file), true)
@@ -96,7 +98,7 @@ test('a file that is not there is made, with its folder', () => {
   assert.deepEqual(readSettings(file), {})
   installHookFile(file, REC)
   assert.equal(hooksInstalledIn(file), true)
-  assert.equal(fs.existsSync(`${file}.ai-call-stack.bak`), false)
+  assert.equal(fs.existsSync(`${file}.agent-call-stack.bak`), false)
   fs.rmSync(dir, { recursive: true })
 })
 
@@ -146,4 +148,26 @@ test('the user file and the workspace file, and the recorder copied to a fixed p
   assert.equal(target, recorderPath(path.join(dir, 'data')))
   assert.equal(fs.readFileSync(target, 'utf8'), 'console.log(1)')
   fs.rmSync(dir, { recursive: true })
+})
+
+test('the hook command runs the node it is given, quoted, so a shell without a version manager finds it', () => {
+  assert.equal(
+    commandFor('/r/record.cjs', 'Stop', { exe: '/home/me/.local/share/mise/shims/node' }),
+    '"/home/me/.local/share/mise/shims/node" "/r/record.cjs" Stop',
+  )
+})
+
+test('the hooks run VS Code as node when asked, and node by its full path otherwise', () => {
+  const electron = runtime(true)
+  assert.equal(electron.electron, true)
+  assert.equal(electron.exe, process.execPath)
+  const node = runtime(false)
+  assert.ok(node.electron || path.isAbsolute(node.exe))
+})
+
+test('an electron runtime sets ELECTRON_RUN_AS_NODE in the command', () => {
+  assert.equal(
+    commandFor('/r/record.cjs', 'Stop', { exe: '/usr/share/code/code', electron: true }),
+    'ELECTRON_RUN_AS_NODE=1 "/usr/share/code/code" "/r/record.cjs" Stop',
+  )
 })

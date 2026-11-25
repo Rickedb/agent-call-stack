@@ -7,7 +7,7 @@ import { index } from './context'
 import { clip, dur, icon, mark, modelName, RES_GLYPH, sizeOf, span, tokCount, tokText } from './format'
 
 /**
- * The tree as plain text, for a chat reply (`@calltree`): the stack of what runs
+ * The tree as plain text, for a chat reply (`@callstack`): the stack of what runs
  * now, innermost first, then the latest prompt as a tree.
  */
 export const renderText = (s: Session | undefined, now: number): string => {

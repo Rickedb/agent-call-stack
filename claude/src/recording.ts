@@ -14,6 +14,42 @@ async function noteModel($: EngineInterface, id: string, model: string | undefin
   await updateNodes($, list => patch(list, id, { model }))
 }
 
+// What the model wrote in one block of a step: its thinking, or a piece of its reply.
+type Block = { name: 'Thinking' | 'Reply'; text: string; start: number; isDrawn: boolean }
+
+// A note is a row under the prompt (or the subagent) whose loop wrote it, drawn running from the block's
+// first piece and settled when the step ends, with its whole text.
+async function putNote(
+  $: EngineInterface,
+  at: { turnId: string; index: number; agentId?: string },
+  key: number,
+  b: Block,
+  isDone: boolean,
+) {
+  const id = `${at.turnId}:${at.agentId ?? ''}:note:${at.index}:${key}`
+  const rootId = await readRoot($)
+  const parent = at.agentId ? `a:${at.agentId}` : at.turnId
+  const text = isDone ? await keep($, id, 'output', b.text) : {}
+  const now = Date.now()
+  await updateNodes($, list => {
+    // A subagent's note may come before its spawn settles.
+    const withAgent =
+      at.agentId && !list.some(n => n.id === parent)
+        ? upsert(list, { id: parent, parent: rootId || undefined, kind: 'agent', name: 'subagent', arg: '', status: 'run', start: now })
+        : list
+    return upsert(withAgent, {
+      id,
+      parent,
+      kind: 'note',
+      name: b.name,
+      arg: isDone ? clip(b.text, 160) : '',
+      status: isDone ? 'ok' : 'run',
+      start: b.start,
+      ...(isDone ? { end: now, ...text } : {}),
+    })
+  })
+}
+
 // A response the model stopped in a way that is a problem, in the words a person says it.
 const STOPS: Record<string, string> = {
   max_tokens: 'the reply hit the output limit',
@@ -86,7 +122,31 @@ export const recording = (on: On) => {
   // The model of each response of the prompt's turn; a subagent's is known at its spawn.
   on('turn.step', async function* ($, e, next) {
     await guard($, 'model', () => noteModel($, e.turnId, e.model))
-    const step = yield* next(e)
+    // The thinking and the text between calls arrive here as the response streams: a row for each block.
+    const blocks = new Map<number, Block>()
+    const stream = next(e)
+    try {
+      for await (const chunk of stream) {
+        if (chunk.kind === 'text' || chunk.kind === 'thinking') {
+          let b = blocks.get(chunk.index)
+          if (!b) blocks.set(chunk.index, (b = { name: chunk.kind === 'thinking' ? 'Thinking' : 'Reply', text: '', start: Date.now(), isDrawn: false }))
+          b.text += chunk.text
+          if (!b.isDrawn && b.text.trim()) {
+            b.isDrawn = true
+            const key = chunk.index
+            const row = b
+            await guard($, 'note', () => putNote($, e, key, row, false))
+          }
+        }
+        yield chunk
+      }
+    } finally {
+      // Whether the step ended or was cut short, what was written is kept with its whole text.
+      for (const [key, b] of blocks) {
+        if (b.text.trim()) await guard($, 'note', () => putNote($, e, key, b, true))
+      }
+    }
+    const step = await stream.result
     await guard($, 'stop', () => noteStop($, e, step.stopReason))
     return step
   })

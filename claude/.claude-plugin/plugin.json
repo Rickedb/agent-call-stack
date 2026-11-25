@@ -1,6 +1,6 @@
 {
-  "name": "ai-call-stack",
-  "version": "0.1.1",
-  "description": "A live pane showing Claude's calling tree like a stack trace: prompt, subagents, tool calls.",
+  "name": "agent-call-stack",
+  "version": "0.1.2",
+  "description": "A live pane beside the chat that shows what Claude is doing as a call stack: prompts, the model's thinking and replies, subagents and tool calls, as a tree or a waterfall with status, duration, models, tokens, approvals, errors and compactions.",
   "types": "./types/index.d.ts"
 }

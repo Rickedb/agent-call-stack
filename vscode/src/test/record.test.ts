@@ -8,7 +8,7 @@ import { test } from 'node:test'
 import { KEEP, normalize, resultText, spill, touchOf } from '../record'
 import type { Ev } from '../types'
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'call-tree-'))
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'call-stack-'))
 
 test('a snake_case PreToolUse becomes a tool_pre with its arguments read', () => {
   const ev = normalize(
@@ -83,7 +83,7 @@ test('a spawn tool call carries the description and prompt for its subagent', ()
 })
 
 test('the chat commands of this extension are not recorded as prompts', () => {
-  assert.equal(normalize('UserPromptSubmit', { session_id: 's', prompt: '@calltree' }, 1), null)
+  assert.equal(normalize('UserPromptSubmit', { session_id: 's', prompt: '@callstack' }, 1), null)
   assert.ok(normalize('UserPromptSubmit', { session_id: 's', prompt: 'fix it' }, 1))
 })
 
@@ -100,7 +100,7 @@ test('the script writes a line per event, prints {}, and survives garbage', () =
   const dir = tmp()
   const script = path.join(__dirname, '..', 'record.js')
   const run = (event: string, input: string) =>
-    spawnSync(process.execPath, [script, event], { input, env: { ...process.env, AI_CALL_STACK_DIR: dir } })
+    spawnSync(process.execPath, [script, event], { input, env: { ...process.env, AGENT_CALL_STACK_DIR: dir } })
 
   const a = run('UserPromptSubmit', JSON.stringify({ session_id: 'sess', cwd: '/w', prompt: 'hello' }))
   assert.equal(a.status, 0)

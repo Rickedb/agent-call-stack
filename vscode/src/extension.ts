@@ -6,13 +6,14 @@ import * as vscode from 'vscode'
 
 import { ChatModelReader } from './chatmodels'
 import { collapseOlder } from './collapse'
-import { hookFile, installHookFile, installRecorder, refreshHookFile, removeHookFile } from './hooks'
+import { hookFile, installHookFile, installRecorder, refreshHookFile, removeHookFile, runtime, type Runtime } from './hooks'
 import type { Session } from './model'
 import { foldableIds, isRunning, renderBody, renderText, summaryMarkdown } from './render'
 import { EventStore } from './store'
+import { TranscriptReader } from './transcript'
 
-const VIEW = 'aiCallStack.view'
-const dataDir = () => process.env.AI_CALL_STACK_DIR || path.join(os.homedir(), '.copilot', 'ai-call-stack')
+const VIEW = 'agentCallStack.view'
+const dataDir = () => process.env.AGENT_CALL_STACK_DIR || path.join(os.homedir(), '.copilot', 'agent-call-stack')
 
 const workspaceFolders = () => (vscode.workspace.workspaceFolders ?? []).map(f => f.uri.fsPath)
 
@@ -25,7 +26,7 @@ const hooksInstalled = () =>
     f => !!f && fs.existsSync(f),
   )
 
-class CallTreeView implements vscode.WebviewViewProvider {
+class CallStackView implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView
   private timer?: NodeJS.Timeout
   private mode: 'tree' | 'waterfall'
@@ -37,6 +38,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
   private shut = new Set<string>()
   /** The prompts already seen, so that only a new one folds the rest. */
   private seen = new Set<string>()
+  private transcripts = new TranscriptReader()
 
   constructor(
     private ctx: vscode.ExtensionContext,
@@ -47,7 +49,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
     this.mode =
       saved === 'tree' || saved === 'waterfall'
         ? saved
-        : vscode.workspace.getConfiguration('aiCallStack').get<string>('defaultView') === 'tree'
+        : vscode.workspace.getConfiguration('agentCallStack').get<string>('defaultView') === 'tree'
           ? 'tree'
           : 'waterfall'
     // A new prompt folds the ones before it; what history there is, folds but the latest.
@@ -79,6 +81,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
     // By default the newest one that has a prompt: one that only started has nothing to show.
     const s = (this.picked && list.find(s => s.id === this.picked)) || list.find(hasPrompt) || list[0]
     this.models.apply(s)
+    this.transcripts.apply(s)
     return s
   }
 
@@ -93,7 +96,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${view.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="${uri('style.css')}">
-<title>Call tree</title></head>
+<title>Agent Call Stack</title></head>
 <body><div id="root"></div><script nonce="${nonce}" src="${uri('main.js')}"></script></body></html>`
 
     view.webview.onDidReceiveMessage(m => void this.onMessage(m))
@@ -166,13 +169,13 @@ class CallTreeView implements vscode.WebviewViewProvider {
         this.selected = ''
         break
       case 'install':
-        await vscode.commands.executeCommand('aiCallStack.installHooks')
+        await vscode.commands.executeCommand('agentCallStack.installHooks')
         break
       case 'installUser':
-        await vscode.commands.executeCommand('aiCallStack.installHooks', 'user')
+        await vscode.commands.executeCommand('agentCallStack.installHooks', 'user')
         break
       case 'installWorkspace':
-        await vscode.commands.executeCommand('aiCallStack.installHooks', 'workspace')
+        await vscode.commands.executeCommand('agentCallStack.installHooks', 'workspace')
         break
       case 'openSettings':
         await vscode.commands.executeCommand('workbench.action.openSettings', 'chat.useHooks')
@@ -181,14 +184,14 @@ class CallTreeView implements vscode.WebviewViewProvider {
         const md = summaryMarkdown(s, m.id ?? '', Date.now())
         if (md) {
           await vscode.env.clipboard.writeText(md)
-          void vscode.window.setStatusBarMessage('Call tree: summary copied as markdown', 2000)
+          void vscode.window.setStatusBarMessage('Agent Call Stack: summary copied as markdown', 2000)
         }
         return
       }
       case 'copyTranscript': {
         if (!node?.transcript) return
         await vscode.env.clipboard.writeText(node.transcript)
-        void vscode.window.setStatusBarMessage('Call tree: transcript path copied', 2000)
+        void vscode.window.setStatusBarMessage('Agent Call Stack: transcript path copied', 2000)
         return
       }
       case 'copy':
@@ -200,7 +203,7 @@ class CallTreeView implements vscode.WebviewViewProvider {
         // The whole text: from its file when the log kept only a cut.
         else if (file) text = await fs.promises.readFile(file, 'utf8').catch(() => text)
         await vscode.env.clipboard.writeText(text)
-        void vscode.window.setStatusBarMessage('Call tree: copied', 2000)
+        void vscode.window.setStatusBarMessage('Agent Call Stack: copied', 2000)
         // Nothing changed on screen but the icon, which the page flips itself: no redraw.
         return
       }
@@ -214,8 +217,10 @@ export function activate(ctx: vscode.ExtensionContext): void {
   store.start()
   ctx.subscriptions.push({ dispose: () => store.stop() })
 
-  const provider = new CallTreeView(ctx, store)
+  const provider = new CallStackView(ctx, store)
   const recorderSource = ctx.asAbsolutePath(path.join('out', 'record.js'))
+  // What the hooks run the recorder with: node, or VS Code itself as node when the setting is on.
+  const node = (): Runtime => runtime(vscode.workspace.getConfiguration('agentCallStack').get<boolean>('useElectronAsNode') === true)
 
   // The recorder the hooks run is a copy; keep it as new as the extension.
   if (hooksInstalled()) {
@@ -223,7 +228,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
       const recorder = installRecorder(recorderSource, dataDir())
       // ...and the hook files list every event it records.
       for (const f of [hookFile('user'), ...workspaceFolders().map(w => hookFile('workspace', w))]) {
-        if (f) refreshHookFile(f, recorder)
+        if (f) refreshHookFile(f, recorder, node())
       }
     } catch {
       // The copy there keeps working.
@@ -245,7 +250,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
             ]
           : []),
       ],
-      { title: 'Where should the call tree hooks be installed?' },
+      { title: 'Where should the call stack hooks be installed?' },
     )
     return pick?.scope
   }
@@ -255,7 +260,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
     const folder = workspaceFolders()[0]
     const given: Scope | undefined = asked === 'user' || asked === 'workspace' ? asked : undefined
     if (given === 'workspace' && !folder) {
-      void vscode.window.showErrorMessage('Call tree: open a folder to install the hooks for this workspace.')
+      void vscode.window.showErrorMessage('Agent Call Stack: open a folder to install the hooks for this workspace.')
       return
     }
     const scope = given ?? (await askScope(folder))
@@ -265,9 +270,9 @@ export function activate(ctx: vscode.ExtensionContext): void {
     if (!file) return
     try {
       const recorder = installRecorder(recorderSource, dataDir())
-      installHookFile(file, recorder)
+      installHookFile(file, recorder, node())
     } catch (err) {
-      void vscode.window.showErrorMessage(`Call tree: could not install hooks: ${String(err)}`)
+      void vscode.window.showErrorMessage(`Agent Call Stack: could not install hooks: ${String(err)}`)
       return
     }
 
@@ -275,13 +280,13 @@ export function activate(ctx: vscode.ExtensionContext): void {
     const other = hookFile(pick.scope === 'user' ? 'workspace' : 'user', folder)
     if (other && fs.existsSync(other)) {
       const answer = await vscode.window.showWarningMessage(
-        `Call tree hooks are also installed in ${other}. Both would run and record every call twice.`,
+        `Agent Call Stack hooks are also installed in ${other}. Both would run and record every call twice.`,
         'Remove it',
       )
       if (answer === 'Remove it') removeHookFile(other)
     }
     void vscode.window.showInformationMessage(
-      `Call tree hooks installed in ${file}. Start a new Copilot agent chat. If nothing shows up, check that agent hooks are enabled in VS Code (setting chat.useHooks) and that node is on your PATH.`,
+      `Agent Call Stack hooks installed in ${file}. Start a new Copilot agent chat. If nothing shows up, check that agent hooks are enabled in VS Code (setting chat.useHooks) and that node is installed (on Windows, on your PATH).`,
     )
     provider.render()
   }
@@ -290,7 +295,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
     const files = [hookFile('user'), ...workspaceFolders().map(w => hookFile('workspace', w))]
     const removed = files.filter((f): f is string => !!f && removeHookFile(f))
     void vscode.window.showInformationMessage(
-      removed.length ? `Call tree hooks removed: ${removed.join(', ')}` : 'No call tree hooks were installed.',
+      removed.length ? `Agent Call Stack hooks removed: ${removed.join(', ')}` : 'No call stack hooks were installed.',
     )
     provider.render()
   }
@@ -299,10 +304,10 @@ export function activate(ctx: vscode.ExtensionContext): void {
     vscode.window.registerWebviewViewProvider(VIEW, provider, {
       webviewOptions: { retainContextWhenHidden: true },
     }),
-    vscode.commands.registerCommand('aiCallStack.open', () => vscode.commands.executeCommand(`${VIEW}.focus`)),
-    vscode.commands.registerCommand('aiCallStack.installHooks', installHooks),
-    vscode.commands.registerCommand('aiCallStack.uninstallHooks', uninstallHooks),
-    vscode.commands.registerCommand('aiCallStack.clear', () => {
+    vscode.commands.registerCommand('agentCallStack.open', () => vscode.commands.executeCommand(`${VIEW}.focus`)),
+    vscode.commands.registerCommand('agentCallStack.installHooks', installHooks),
+    vscode.commands.registerCommand('agentCallStack.uninstallHooks', uninstallHooks),
+    vscode.commands.registerCommand('agentCallStack.clear', () => {
       store.clear(store.model.list(workspaceFolders()).map(s => s.id))
     }),
   )
@@ -312,21 +317,21 @@ export function activate(ctx: vscode.ExtensionContext): void {
   if (!hooksInstalled() && !ctx.globalState.get<boolean>(PROMPTED)) {
     void vscode.window
       .showInformationMessage(
-        'Call Tree needs the Copilot hooks installed to record what the agent does.',
+        'Agent Call Stack needs the Copilot hooks installed to record what the agent does.',
         'Install hooks',
         "Don't ask again",
       )
       .then(answer => {
-        if (answer === 'Install hooks') void vscode.commands.executeCommand('aiCallStack.installHooks')
+        if (answer === 'Install hooks') void vscode.commands.executeCommand('agentCallStack.installHooks')
         if (answer === "Don't ask again") void ctx.globalState.update(PROMPTED, true)
       })
   }
 
-  // `@calltree` in the chat: the tree as text, the counterpart of the original's `/call-tree`.
+  // `@callstack` in the chat: the tree as text, the counterpart of the original's `/call-stack`.
   if (vscode.chat?.createChatParticipant) {
-    const participant = vscode.chat.createChatParticipant('ai-call-stack.calltree', async (_req, _chat, stream) => {
+    const participant = vscode.chat.createChatParticipant('agent-call-stack.callstack', async (_req, _chat, stream) => {
       stream.markdown('```text\n' + renderText(provider.current(), Date.now()) + '\n```')
-      stream.button({ command: 'aiCallStack.open', title: 'Open the call tree pane' })
+      stream.button({ command: 'agentCallStack.open', title: 'Open the call stack pane' })
     })
     participant.iconPath = new vscode.ThemeIcon('type-hierarchy')
     ctx.subscriptions.push(participant)

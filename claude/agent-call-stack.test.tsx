@@ -7,11 +7,11 @@ import { sequenceOf, shellKind, shellOf, stepsOf, toolArg, toolName } from './sr
 import { glyph } from './src/pane/theme'
 
 const PANE = {
-  plugin: 'ai-call-stack',
+  plugin: 'agent-call-stack',
   component: 'Pane',
-  requestId: 'ai-call-stack',
+  requestId: 'agent-call-stack',
   props: {
-    title: 'Call tree',
+    title: 'Agent Call Stack',
     isFocused: false,
     bodyColumns: 80,
     placement: 'dock',
@@ -22,7 +22,7 @@ const PANE = {
 
 test('the waterfall lists a call and a press opens its details', async ($, on) => {
   // Nothing sits beneath the plugin: each hook here stands for the engine.
-  on('command.register', () => ({ value: { command: 'call-tree' } }))
+  on('command.register', () => ({ value: { command: 'call-stack' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: null }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
@@ -69,7 +69,7 @@ test('the waterfall lists a call and a press opens its details', async ($, on) =
 })
 
 test('the same calls draw as a tree and as a waterfall', async ($, on) => {
-  on('command.register', () => ({ value: { command: 'call-tree' } }))
+  on('command.register', () => ({ value: { command: 'call-stack' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: null }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
@@ -97,7 +97,7 @@ test('the same calls draw as a tree and as a waterfall', async ($, on) => {
 })
 
 test('two prompts draw one after the other, with no paging', async ($, on) => {
-  on('command.register', () => ({ value: { command: 'call-tree' } }))
+  on('command.register', () => ({ value: { command: 'call-stack' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: null }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
@@ -131,7 +131,7 @@ test('two prompts draw one after the other, with no paging', async ($, on) => {
 
 test('a long result is cut in the state and kept whole in a file', async ($, on) => {
   const written: Record<string, string> = {}
-  on('command.register', () => ({ value: { command: 'call-tree' } }))
+  on('command.register', () => ({ value: { command: 'call-stack' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: null }))
   on('env.get', () => ({ value: '/home/test' }))
@@ -149,7 +149,7 @@ test('a long result is cut in the state and kept whole in a file', async ($, on)
 
   const paths = Object.keys(written)
   expect(paths.length).toBe(1)
-  expect(paths[0]).toMatch(/^\/home\/test\/\.claude\/ai-call-stack\/.*\.output\.txt$/)
+  expect(paths[0]).toMatch(/^\/home\/test\/\.claude\/agent-call-stack\/.*\.output\.txt$/)
   expect(written[paths[0] ?? '']?.length).toBe(50000)
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
@@ -163,7 +163,7 @@ test('a long result is cut in the state and kept whole in a file', async ($, on)
 })
 
 test('the chat before the mod loaded is read back from history', async ($, on) => {
-  on('command.register', () => ({ value: { command: 'call-tree' } }))
+  on('command.register', () => ({ value: { command: 'call-stack' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: null }))
   on('session.messages', () => ({
@@ -195,7 +195,7 @@ test('the chat before the mod loaded is read back from history', async ($, on) =
 })
 
 test('a live prompt folds the history before it, and sits above it', async ($, on) => {
-  on('command.register', () => ({ value: { command: 'call-tree' } }))
+  on('command.register', () => ({ value: { command: 'call-stack' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: null }))
   on('session.messages', () => ({
@@ -327,14 +327,14 @@ test('a closed pane leaves a button to open it again', async ($, on) => {
   })
 
   const band = {
-    plugin: 'ai-call-stack',
+    plugin: 'agent-call-stack',
     component: 'AbovePrompt',
     requestId: 'band',
     props: { hasSurvey: false, isCollapsed: false, isWorking: false, maxRows: 4, scroll: { offset: 0, bodyRows: 4 }, view: {} },
   } as const
 
   const ui = await $.ui.mount({ ...band, surface: 'desktop' } as never)
-  expect(await ui.find({ type: 'Button', key: 'open-call-tree' })).toBeDefined()
+  expect(await ui.find({ type: 'Button', key: 'open-call-stack' })).toBeDefined()
   expect(opened).toBe(0)
   await ui.unmount()
 })
@@ -404,7 +404,7 @@ test('the summary counts calls by tool, tokens, time in calls, and skips history
 })
 
 test('a prompt and its subagent show the model they ran on', async ($, on) => {
-  on('command.register', () => ({ value: { command: 'call-tree' } }))
+  on('command.register', () => ({ value: { command: 'call-stack' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: null }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
@@ -510,7 +510,7 @@ test('the waterfall marks only a failure; the tree marks every status', async ($
 })
 
 test('the summary collapses to its header, and opens again', async ($, on) => {
-  on('command.register', () => ({ value: { command: 'call-tree' } }))
+  on('command.register', () => ({ value: { command: 'call-stack' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: null }))
   on('session.start', (_, e) => ({ cwd: e.cwd }))
@@ -540,7 +540,7 @@ test('the summary collapses to its header, and opens again', async ($, on) => {
 })
 
 const quiet = (on: (...a: any[]) => unknown) => {
-  on('command.register', () => ({ value: { command: 'call-tree' } }))
+  on('command.register', () => ({ value: { command: 'call-stack' } }))
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('clock.every', () => ({ value: null }))
   on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
@@ -861,6 +861,8 @@ test('a shell call is named by the program it runs, without the cd that only mov
   const op = (o: string) => glyph(call({ touch: { op: o, paths: [] } }))
   expect([op('run'), op('read'), op('edit'), op('write')]).toEqual(['❯_', '≡', '✎', '✚'])
   expect([op('other'), glyph(call({ name: 'TodoWrite' }))]).toEqual(['', ''])
+  // A tool an MCP server gave the agent has its own glyph, whatever it touched.
+  expect([glyph(call({ name: 'mcp__github__search' })), glyph(call({ name: 'mcp__fs__read', touch: { op: 'read', paths: ['/a'] } })), glyph(call({ name: 'mcpish' }))]).toEqual(['◈', '◈', ''])
 })
 
 test('the details of a shell call show its commands as a tree, and the row is named by the first that is not a cd', async ($, on) => {
@@ -939,3 +941,46 @@ test('a call shows what it involved under its row, in the tree and the waterfall
   await ui.unmount()
 })
 
+
+test('what the model writes between calls is a row each: its thinking and its reply, in order with the calls', async ($, on) => {
+  quiet(on)
+  on('turn.step', async function* (_, e) {
+    // A response streams its thinking and its text in blocks, each in pieces, then asks for a call.
+    yield { kind: 'thinking', index: 0, text: 'Where is the config ' } as never
+    yield { kind: 'thinking', index: 0, text: 'read?' } as never
+    yield { kind: 'text', index: 1, text: "I'll read " } as never
+    yield { kind: 'text', index: 1, text: 'the file.' } as never
+    return { turnId: e.turnId, index: e.index, answer: "I'll read the file.", toolUses: [], stopReason: 'tool_use', usage: null } as never
+  })
+  on('tool.call', () => ({ result: {}, text: 'code' }))
+
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'fix it', turnId: 'nt' })
+  const seen: string[] = []
+  for await (const chunk of $.turn.step({ turnId: 'nt', index: 0, model: 'claude-opus-5-5' } as never)) {
+    seen.push((chunk as { text: string }).text)
+  }
+  // The chunks go on to the engine untouched.
+  expect(seen.join('')).toBe("Where is the config read?I'll read the file.")
+  await $.tool.call({ tool: 'Read', file_path: '/a.ts' })
+  await $.turn.complete({ turnId: 'nt', reason: 'answer', answer: 'done' } as never)
+
+  const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+  const thinking = await ui.find({ type: 'Button', text: /Thinking.*Where is the config read\?/ })
+  const reply = await ui.find({ type: 'Button', text: /Reply.*I'll read the file\./ })
+  const read = await ui.find({ type: 'Button', text: /Read/ })
+  expect(thinking).toBeDefined()
+  expect(reply).toBeDefined()
+  expect(read).toBeDefined()
+  // Thinking, then the reply, then the call.
+  const keys = [thinking?.key, reply?.key, read?.key].map(String)
+  expect(keys[0]).toMatch(/note:0:0$/)
+  expect(keys[1]).toMatch(/note:0:1$/)
+
+  // The details name what it is and show the whole text; the summary counts calls, not notes.
+  await ui.press({ key: thinking?.key ?? '' })
+  expect(await ui.find({ type: 'Text', text: /the model's thinking between calls/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /THINKING/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /Where is the config read\?/ })).toBeDefined()
+  await ui.unmount()
+})

@@ -1,6 +1,7 @@
 :root {
   --c-prompt: var(--vscode-charts-blue, #3794ff);
   --c-agent: var(--vscode-charts-purple, #b180d7);
+  --c-note: var(--vscode-charts-orange, #d18616);
   --c-tool: var(--vscode-charts-green, #89d185);
   --c-run: var(--vscode-charts-yellow, #cca700);
   --c-err: var(--vscode-errorForeground, #f48771);
@@ -26,16 +27,19 @@ button {
 
 .tint-prompt { color: var(--c-prompt); }
 .tint-agent { color: var(--c-agent); }
+.tint-note { color: var(--c-note); }
 .tint-tool { color: var(--c-tool); }
 .tint-run { color: var(--c-run); }
 .tint-err { color: var(--c-err); }
 .tint-prompt-bg { background: var(--c-prompt); }
 .tint-agent-bg { background: var(--c-agent); }
+.tint-note-bg { background: var(--c-note); }
 .tint-tool-bg { background: var(--c-tool); }
 .tint-run-bg { background: var(--c-run); }
 .tint-err-bg { background: var(--c-err); }
 .tint-prompt-border { border-color: var(--c-prompt) !important; }
 .tint-agent-border { border-color: var(--c-agent) !important; }
+.tint-note-border { border-color: var(--c-note) !important; }
 .tint-tool-border { border-color: var(--c-tool) !important; }
 .tint-run-border { border-color: var(--c-run) !important; }
 .tint-err-border { border-color: var(--c-err) !important; }

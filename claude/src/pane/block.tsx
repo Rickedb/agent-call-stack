@@ -16,13 +16,15 @@ export function block($: EngineInterface, c: Pane, n: Node, which: 'input' | 'ou
   const key = `${n.id}:${which}`
   // A compaction's input is what it was told to keep, its output the summary it left.
   const label =
-    n.kind === 'event' && n.name === 'Compact'
-      ? which === 'input'
-        ? 'INSTRUCTIONS'
-        : 'SUMMARY'
-      : which === 'input'
-        ? 'INPUT'
-        : 'OUTPUT'
+    n.kind === 'note'
+      ? n.name.toUpperCase()
+      : n.kind === 'event' && n.name === 'Compact'
+        ? which === 'input'
+          ? 'INSTRUCTIONS'
+          : 'SUMMARY'
+        : which === 'input'
+          ? 'INPUT'
+          : 'OUTPUT'
   const split = text.split('\n')
   const isOpen = c.whole.has(key)
   const visible = isOpen ? split : split.slice(0, LINES)

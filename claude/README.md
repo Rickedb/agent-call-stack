@@ -1,24 +1,51 @@
-# ai-call-stack for Claude Code
+# Agent Call Stack for Claude Code
 
-The Claude Code target of [ai-call-stack](../README.md). A Claude Code mod that adds a live "Call tree" pane beside the chat. It shows what Claude is doing as a tree, like a stack trace: each prompt, the subagents it started, and the tool calls inside them, with status and duration. Running calls are listed at the top as the current stack, innermost first.
+A live "Agent Call Stack" pane beside the Claude Code chat, as a Claude Code mod. It shows what Claude is doing like a stack trace: each prompt, what the model thought and replied between calls, the subagents it started and the tool calls inside them, with status, duration, the model, the tokens the API counted, what you were asked to approve, errors and compactions. Running calls are listed at the top as the current stack, innermost first. It draws as a tree or a waterfall, and a row opens its input and output inline.
+
+Part of [Agent Call Stack](../README.md), which also has the same view for [Claude Code in VS Code](../claude-vscode/README.md) and [GitHub Copilot](../vscode/README.md).
+
+**The layout, as an illustration.** The pane is terminal text, so there is no screenshot here: this is drawn by hand to show the layout (the VS Code extensions' pictures are generated from their real code). Bars are boxes at the right end of each line; the real pane colors them and puts a colored status mark on each row.
 
 ```
-Stack (innermost first)
-  at 🔧 Bash(npm test)  2.1s
-  at 🤖 Explore: find auth code  8.4s
+ Tree  Waterfall                                                        fold all
+ 1 prompt   ✓ 8   ✗ 1
 
-💬 ✓ Prompt 1                               12.3s
-├─ 🤖 ● Explore: find auth code             8.4s
-│  ├─ 🔧 ✓ Grep(auth)                       0.2s
-│  └─ 🔧 ● Bash(npm test)                   2.1s
-└─ 🔧 ✓ Edit(src/login.ts)                  0.1s
+ Stack (innermost first)
+   at ❯_ npm test                                                          2.3s
+
+ ▾ Prompt 1 opus-5-5  Fix the failing login test and add a…    ~2.9k tok   22.0s  ██████████████
+   ∴ Thinking  The login test fails on an expired token…            ~40 tok    1.1s  ▌
+   ▾ Explore haiku-5-5  find where login tokens expire                         6.8s    ▐████▌   slowest
+     ▸ ? Grep  expiresAt +2                                         ~31 tok   300ms    █
+     ▸ ≡ Read  src/auth/token.ts +1                                 ~23 tok   200ms    █
+   “ Reply  Found it: `isExpired` compares expiresAt in the wrong…  ~47 tok    2.3s       ▐██▌
+   ▸ ✎ Edit  src/auth/token.ts +1                                    ~6 tok   150ms          █
+   ▸ ❯_ npm test ✗  +1   asked, waited 700ms                        ~45 tok    2.2s            ██▌
+   ▸ ❯_ npm test +1                                                 ~52 tok    2.3s               ██▌
+
+ ▾ Summary · 8 tool calls · 1 failed · took 22.0s · 53% of it in a call          Copy
 ```
+
+## Getting started
+
+1. **Install** from the marketplace at the repo root:
+
+   ```
+   /plugin install agent-call-stack --marketplace Rickedb/agent-call-stack
+   ```
+
+   To try it from a checkout instead, run `claude --plugin-dir <this folder>` (this folder is `claude/`).
+2. **Start a session.** The pane opens at session start. Run `/call-stack` to open it again.
+3. **Click a row** to open its details inline, under the row. (The engine has no modal API; the VS Code extensions open them in a modal. See `AGENTS.md`.)
+
+Rows draw in columns (output tokens, time) with a single colored status glyph. In the waterfall each call is one line, with its bar in a column at the right end, drawn with boxes (no text to wrap, whatever the surface's font); the bar column is a quarter of the width (8 to 32 cells) and is always there. A row's time badge is what the call itself took (a prompt's, its total), never the time elapsed before it: the bar shows where it started. A pane narrower than 72 columns gives up the "slowest" label first, and the name truncates last. The newest prompt is on top. When a prompt starts, the ones before it fold away (open any again with its arrow, or use *fold all* / *unfold all*).
 
 ## Reading the tree
 
 - **Nesting.** A subagent is a row, and the calls it makes are its children. Guide lines (`├─ └─`) draw the branches. Neither Copilot's hooks nor the engine say which tool call started another, so a tool that calls other tools shows as siblings, not as parent and child; only subagents nest.
 - **What a call involved.** Under a tool call's row, in the tree and the waterfall, once you open it, one row for each thing it involved: a file (its name only, with what was done to it and, for an edit, its lines: `◦ login.ts edit +2 −1`), an address it fetched (`↗ x.dev/docs/auth fetch`, the scheme left off), the command it ran (`$ npm test run`), what it searched for (`? login search`). The rows have no time or bar of their own. A click on one opens inline under the row the whole path, address or command, what the call did, and every call of the prompt that involved the same one (each a button that opens that call's details), with their lines in all; *Open the call* goes to the call itself. They are shut until you open them: a call with something under it has an arrow (`▸`, and a `+2` after it counting them), and a click on it opens them (`▾`) or shuts them again; *fold all* shuts them too. Over eight, the rest are counted (`+3 more`). They are read from what each call was given, (see *What a call touched*), so they show while the call runs.
-- **Names and icons.** A shell call is named by the first command it runs that is not a common call: `cd /app && npm test` is `npm` with `test` after it, and `cd`, `pushd`, `export`, `set`, `source`, `clear`, `Set-Location`, `$env:X = ...` and the like only say where or with what, so they are passed over (so are `VAR=x` settings before a program). A line that runs no program of its own is named by its shell: `bash`, or `pwsh` for a PowerShell call (by the tool's name, a cmdlet such as `Get-ChildItem`, or a `$env:` setting). The icon says what the call did: `❯_` for a command (the terminal's prompt), `≡` read, `✎` edit, `✚` write, `?` search, `↗` fetch (narrow characters, so the columns hold in every terminal); a call that touched nothing mapped keeps none. The summary still groups by the tool's own name.
+- **What the model wrote between calls.** A `Thinking` row (`∴`) and a `Reply` row (`“`) sit in order among the calls, under the prompt or subagent whose loop wrote them: the text the model streams before it asks for a call ("I'll read the config first"), and its reasoning. They come from the `turn.step` stream, so a block shows as running from its first piece and settles when the step ends, with its whole text (its details show it, cut at 8,000 characters in the state and whole in a file beyond that). A row's time is how long the model took to write it, and its badge the text's estimated tokens. Thinking shows only when the model returns its text: some models and settings return a signature and no text, and then there is no row. They are not calls: the summary and the counts leave them out. What the chat held before the mod loaded (History) has none, since the engine's message list gives no per-block text or times.
+- **Names and icons.** A shell call is named by the first command it runs that is not a common call: `cd /app && npm test` is `npm` with `test` after it, and `cd`, `pushd`, `export`, `set`, `source`, `clear`, `Set-Location`, `$env:X = ...` and the like only say where or with what, so they are passed over (so are `VAR=x` settings before a program). A line that runs no program of its own is named by its shell: `bash`, or `pwsh` for a PowerShell call (by the tool's name, a cmdlet such as `Get-ChildItem`, or a `$env:` setting). The icon says what the call did: `❯_` for a command (the terminal's prompt), `≡` read, `✎` edit, `✚` write, `?` search, `↗` fetch, `◈` a tool an MCP server gave the agent (`mcp__server__tool`), whatever it touched (narrow characters, so the columns hold in every terminal); a call that touched nothing mapped keeps none. The summary still groups by the tool's own name.
 - **The commands of a shell call.** Its details list the commands of the line as a tree, names only, in the order they run: pipelines joined by `&&` (next runs if this succeeded), `||` (if it failed), `;` and `&` at the top, and each pipeline's later commands under the one that feeds them, after a `|` (or `|&`). Each operator has its own color, and a line under the tree says what the ones used mean. The common calls are dim. A line of one command shows no tree. Quotes and `$(...)` hide the operators inside them.
 - **Badges and copy.** A row's output size and time are badges (`~340 tok`, `400ms`). Each input and output text has a copy icon (`⧉`) in the top-right corner of its box, which copies the whole text; "Copy file path" and "Show all" stay as text buttons below it.
 - **Status marks.** The tree puts a glyph on every row (`✓` done, `●` running, `✗` failed). The waterfall does not: the color of a row's bar already says done or running, so only a failure keeps its `✗`, after the name.
@@ -71,20 +98,12 @@ The summary collapses to its header with a click on `▾ Summary` (`▸` when co
 
 **Copy** (a button on the summary's header) puts the whole summary on the clipboard as markdown: a bullet list of the figures and a table with every tool, for a ticket, a PR or a chat. `src/pane/markdown.ts` builds it.
 
-## Use
-
-The pane opens at session start. Run `/call-tree` to open it again.
-
-Rows draw in columns (output tokens, time) with a single colored status glyph. In the waterfall each call is one line, with its bar in a column at the right end, drawn with boxes (no text to wrap, whatever the surface's font); the bar column is a quarter of the width (8 to 32 cells) and is always there. A row's time badge is what the call itself took (a prompt's, its total), never the time elapsed before it: the bar shows where it started. A pane narrower than 72 columns gives up the "slowest" label first, and the name truncates last. The newest prompt is on top. When a prompt starts, the ones before it fold away (open any again with its arrow, or use *fold all* / *unfold all*).
-
-Details open inline, under the row you click. (The engine has no modal API; the VS Code port opens them in a modal. See `AGENTS.md`.)
-
 ## Layout
 
 ```
 hooks/hooks.json      names the one hooks module
 hooks/register.tsx    wires the three parts below
-src/lifecycle.tsx     opening the pane, /call-tree, the button that reopens it
+src/lifecycle.tsx     opening the pane, /call-stack, the button that reopens it
 src/recording.ts      turns, subagents and tool calls into rows
 src/pane/             drawing the rows: index (reads state, picks the view),
                       toolbar, section, row, bar, details, block, widget, theme,
@@ -115,13 +134,8 @@ Validate and type-check:
 
 ```bash
 claude plugin validate .   # checks the manifest and reads the hooks module as the engine will
-claude plugin test .       # runs ai-call-stack.test.tsx
+claude plugin test .       # runs agent-call-stack.test.tsx
 ```
 
-Run it from this folder (`claude/`). Load it in a session with `claude --plugin-dir <this folder>`.
+Run these from this folder (`claude/`). Load it in a session with `claude --plugin-dir <this folder>`.
 
-Install from the marketplace at the repo root:
-
-```
-/plugin install ai-call-stack --marketplace Rickedb/ai-call-stack
-```

@@ -98,7 +98,7 @@ export const section = (c: Ctx, top: Node): string => {
           <button class="label" data-act="select" data-id="${id}" title="${esc(clip(node.arg, 400))}">
             <span>${icon(node)}</span>
             ${isWaterfall ? '' : `<span class="tint-${tint(node)}">${mark(node)}</span>`}
-            <span class="${node.kind === 'tool' || node.kind === 'event' ? '' : 'strong'}">${esc(name)}</span>
+            <span class="${node.kind === 'tool' || node.kind === 'event' || node.kind === 'note' ? '' : 'strong'}">${esc(name)}</span>
             ${isWaterfall && node.status === 'err' ? `<span class="tint-err" title="Failed">${mark(node)}</span>` : ''}
             ${node.model ? `<span class="model" title="The model that answered">${esc(modelName(node.model))}</span>` : ''}
             ${(() => {

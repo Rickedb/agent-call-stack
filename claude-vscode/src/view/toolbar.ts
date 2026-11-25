@@ -17,17 +17,17 @@ export const empty = (v: View): string => {
         <b>No calls yet</b>
         <p>Send a prompt to Claude Code and what it does shows up here, as a tree.</p>
         ${off}
-        <p class="dim">Nothing showing up? A session that was open when the hooks were added picks them up when it starts again. Check that <code>node</code> is on your PATH.</p>
+        <p class="dim">Nothing showing up? A session that was open when the hooks were added picks them up when it starts again. Check that <code>node</code> is installed (on Windows, on your PATH).</p>
       </div>`
   }
   return `<div class="empty">
-        <b>Call Tree is not set up yet</b>
+        <b>Agent Call Stack is not set up yet</b>
         <p>It reads what Claude Code does through hooks, and they are not in your Claude Code settings yet. Add them once (a backup of the file is kept), then send a prompt.</p>
         <div class="actions">
           ${button('installUser', 'Add to your settings', '', 'primary')}
           ${v.hasWorkspace ? button('installWorkspace', 'This workspace only (local settings)') : ''}
         </div>
-        <p class="dim">Needs <code>node</code> on your PATH. ${setting}</p>
+        <p class="dim">The hooks run with <code>node</code>, or with VS Code itself when there is none (not on Windows, where <code>node</code> must be on your PATH). ${setting}</p>
       </div>`
 }
 
@@ -60,7 +60,7 @@ export const toolbar = (c: Ctx): string => {
 
 // How many prompts, and how many calls run, are done or failed.
 export const summary = (c: Ctx): string => {
-  const everyCall = c.prompts.flatMap(p => c.below(p)).filter(n => n.kind !== 'event')
+  const everyCall = c.prompts.flatMap(p => c.below(p)).filter(n => n.kind !== 'event' && n.kind !== 'note')
   const total = {
     ok: everyCall.filter(n => n.status === 'ok').length,
     err: everyCall.filter(n => n.status === 'err').length,

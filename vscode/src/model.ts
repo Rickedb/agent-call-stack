@@ -1,6 +1,6 @@
 import type { Ev, Node } from './types'
 
-export const MAX_NODES = 300
+export const MAX_NODES = 800
 
 type Texts = Pick<Node, 'input' | 'inputLen' | 'inputFile' | 'output' | 'outputLen' | 'outputFile'>
 
@@ -47,6 +47,14 @@ export class Session {
 
   get(id: string): Node | undefined {
     return this.byId.get(id)
+  }
+
+  /** Adds transcript notes once, and only while their prompt or subagent is still in the tree. */
+  addNotes(notes: Node[]): void {
+    for (const n of notes) {
+      if (this.byId.has(n.id) || !n.parent || !this.byId.has(n.parent)) continue
+      this.add(n)
+    }
   }
 
   /** The first prompt, to tell sessions apart. */

@@ -143,7 +143,7 @@ test('a prompt that is the first event is not read twice; a resumed session\'s e
 })
 
 test('the reader reads history once the transcript is there, and a history prompt has a summary and a note', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'call-tree-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'call-stack-'))
   const file = path.join(dir, 't.jsonl')
   const s = new Session('s')
   s.apply({ v: 1, t: ms(60), sid: 's', kind: 'session_start', transcript: file })

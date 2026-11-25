@@ -157,8 +157,8 @@ test('a hook file written before the compaction and error events is brought up t
   const os = await import('node:os')
   const path = await import('node:path')
   const { buildHookConfig, EVENTS, refreshHookFile } = await import('../hooks')
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'call-tree-'))
-  const file = path.join(dir, 'ai-call-stack.json')
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'call-stack-'))
+  const file = path.join(dir, 'agent-call-stack.json')
   const old = buildHookConfig('/r/record.cjs')
   delete (old.hooks as Record<string, unknown>).PreCompact
   delete (old.hooks as Record<string, unknown>).ErrorOccurred

@@ -1,10 +1,20 @@
 {
-  "name": "ai-call-stack-copilot",
-  "displayName": "AI Call Stack for Copilot",
-  "description": "A live pane showing what GitHub Copilot's agent is doing as a call tree: prompt, subagents, tool calls, with status and duration.",
+  "name": "agent-call-stack-copilot",
+  "displayName": "Agent Call Stack for Copilot",
+  "description": "See what GitHub Copilot's agent is doing as a live call stack: prompts, the model's thinking and replies, subagents and tool calls, as a tree or a waterfall with status, duration and token sizes.",
   "version": "0.1.0",
   "publisher": "local",
+  "icon": "media/icon.png",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Rickedb/agent-call-stack.git",
+    "directory": "vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/Rickedb/agent-call-stack/issues"
+  },
+  "homepage": "https://github.com/Rickedb/agent-call-stack#readme",
   "private": true,
   "engines": {
     "vscode": "^1.95.0"
@@ -22,56 +32,56 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "aiCallStack",
-          "title": "Call Tree",
+          "id": "agentCallStack",
+          "title": "Agent Call Stack",
           "icon": "media/icon.svg"
         }
       ]
     },
     "views": {
-      "aiCallStack": [
+      "agentCallStack": [
         {
           "type": "webview",
-          "id": "aiCallStack.view",
-          "name": "Call Tree"
+          "id": "agentCallStack.view",
+          "name": "Call Stack"
         }
       ]
     },
     "commands": [
       {
-        "command": "aiCallStack.open",
-        "title": "Open Call Tree",
-        "category": "Call Tree"
+        "command": "agentCallStack.open",
+        "title": "Open Call Stack",
+        "category": "Agent Call Stack"
       },
       {
-        "command": "aiCallStack.installHooks",
+        "command": "agentCallStack.installHooks",
         "title": "Install Copilot Hooks",
-        "category": "Call Tree",
+        "category": "Agent Call Stack",
         "icon": "$(plug)"
       },
       {
-        "command": "aiCallStack.uninstallHooks",
+        "command": "agentCallStack.uninstallHooks",
         "title": "Remove Copilot Hooks",
-        "category": "Call Tree"
+        "category": "Agent Call Stack"
       },
       {
-        "command": "aiCallStack.clear",
+        "command": "agentCallStack.clear",
         "title": "Clear Recorded Calls",
-        "category": "Call Tree",
+        "category": "Agent Call Stack",
         "icon": "$(clear-all)"
       }
     ],
     "chatParticipants": [
       {
-        "id": "ai-call-stack.calltree",
-        "name": "calltree",
-        "description": "Show the call tree of the current Copilot session as text"
+        "id": "agent-call-stack.callstack",
+        "name": "callstack",
+        "description": "Show the call stack of the current Copilot session as text"
       }
     ],
     "configuration": {
-      "title": "AI Call Stack",
+      "title": "Agent Call Stack",
       "properties": {
-        "aiCallStack.defaultView": {
+        "agentCallStack.defaultView": {
           "type": "string",
           "enum": [
             "tree",
@@ -79,24 +89,29 @@
           ],
           "default": "waterfall",
           "description": "How the rows draw at first: a tree of duration bars, or a waterfall on a time axis."
+        },
+        "agentCallStack.useElectronAsNode": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Run the hooks with VS Code's own executable as node (`ELECTRON_RUN_AS_NODE=1`) instead of a `node` found on this machine. Off by default: `node` is used directly, with its full path, and VS Code is the fallback when no `node` is found. Not used on Windows. Reload the window after changing it."
         }
       }
     },
     "menus": {
       "view/title": [
         {
-          "command": "aiCallStack.clear",
-          "when": "view == aiCallStack.view",
+          "command": "agentCallStack.clear",
+          "when": "view == agentCallStack.view",
           "group": "navigation@1"
         },
         {
-          "command": "aiCallStack.installHooks",
-          "when": "view == aiCallStack.view",
+          "command": "agentCallStack.installHooks",
+          "when": "view == agentCallStack.view",
           "group": "9_hooks@1"
         },
         {
-          "command": "aiCallStack.uninstallHooks",
-          "when": "view == aiCallStack.view",
+          "command": "agentCallStack.uninstallHooks",
+          "when": "view == agentCallStack.view",
           "group": "9_hooks@2"
         }
       ]
@@ -112,5 +127,21 @@
     "@types/node": "^22.0.0",
     "@types/vscode": "1.95.0",
     "typescript": "^5.6.0"
+  },
+  "keywords": [
+    "copilot",
+    "github copilot",
+    "agent",
+    "call stack",
+    "trace",
+    "hooks",
+    "subagents",
+    "tool calls",
+    "tokens",
+    "observability"
+  ],
+  "galleryBanner": {
+    "color": "#1f1f1f",
+    "theme": "dark"
   }
 }

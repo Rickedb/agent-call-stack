@@ -166,9 +166,12 @@ export const toolArg = (n: Node): string => {
   return s ? s.rest : n.arg
 }
 
-/** What a call did, for its icon: from what it touched, so that it holds for any agent's tools. */
-export const toolOp = (n: Node): 'run' | 'read' | 'edit' | 'write' | 'search' | 'web' | 'other' | undefined =>
-  n.kind === 'tool' && n.touch ? n.touch.op : undefined
+/** A tool an MCP server gave the agent: Claude Code names it `mcp__server__tool`, Copilot `mcp_server_tool`. */
+export const isMcp = (n: Node): boolean => n.kind === 'tool' && /^mcp__?[^_]/i.test(n.name)
+
+/** What a call did, for its icon: an MCP tool is its own kind, the rest from what they touched, so that it holds for any agent's tools. */
+export const toolOp = (n: Node): 'mcp' | 'run' | 'read' | 'edit' | 'write' | 'search' | 'web' | 'other' | undefined =>
+  isMcp(n) ? 'mcp' : n.kind === 'tool' && n.touch ? n.touch.op : undefined
 
 /** The commands of a shell call as a sequence, for its details: none unless the line holds more than one command. */
 export const sequenceOf = (n: Node): Step[] => {

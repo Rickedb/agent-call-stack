@@ -34,8 +34,8 @@ What is recorded, folded, counted (tokens) and summed up (a finished prompt's su
 
 1. What does the change add or alter, in terms a person sees?
 2. Does each target do it? If not, do it, or write the exception.
-3. Tests: each target tests it in its own way (`claude/` has `ai-call-stack.test.tsx`, `vscode/` has `npm test`).
-4. READMEs and this file are up to date.
+3. Tests: each target tests it in its own way (`claude/` has `agent-call-stack.test.tsx`, `vscode/` has `npm test`).
+4. READMEs and this file are up to date. After a change to how a VS Code view draws, rerun `scripts/screenshots/shots.cjs` (see the root README) so the pictures match.
 
 ## Known exceptions
 
@@ -44,7 +44,7 @@ What is recorded, folded, counted (tokens) and summed up (a finished prompt's su
 | Reading the chat's earlier messages into the tree when the tool loads | GitHub Copilot (`vscode/`) | Copilot hooks give no access to the chat's history; only what happens after the hooks are installed is recorded. Logs of earlier recorded sessions do come back after a reload. |
 | Exact pairing of a tool call with its result | GitHub Copilot (`vscode/`) | Some Copilot hosts give no tool-call id, so a result is paired by tool and arguments, oldest first. |
 | The built-in `general-purpose` subagent drawn as a row | GitHub Copilot (`vscode/`) | Per GitHub's docs it fires no subagent start or stop hooks. |
-| `/call-tree` opens the pane | GitHub Copilot (`vscode/`) | Replaced by the **Call Tree: Open Call Tree** command and `@calltree`, which prints the tree as text. Same purpose, different surface. |
+| `/call-stack` opens the pane | GitHub Copilot (`vscode/`) | Replaced by the **Agent Call Stack: Open Call Stack** command and `@callstack`, which prints the tree as text. Same purpose, different surface. |
 | The model of each *subagent*, and a model that is certain | GitHub Copilot (`vscode/`) | No Copilot hook event carries a model. The prompt's model is read from VS Code's own chat log (`chatSessions/<session id>.jsonl`, an undocumented format) and matched to prompts by order from the newest end, so it can be missing or wrong; a subagent's is not in it, and says only which model called it. |
 | Token counts the API reported (not estimated) for a prompt and its subagents, with the cache split | GitHub Copilot (`vscode/`) | Copilot's hooks carry no token usage, so every figure there is an estimate. The Claude Code mod estimates only what it cannot get: the calls' own text. |
 | Permission verdicts on a tool call (allowed, asked, denied, which rule) and the time it waited for the person's answer, apart from the time the tool ran | GitHub Copilot (`vscode/`) | Copilot's `PreToolUse` hook carries no verdict (`permissionDecision` is what a hook returns, and ours returns none), and its `permissionRequest` event is Copilot CLI only. A call that waits for the person to approve it shows the wait as part of its time. |
@@ -54,8 +54,11 @@ What is recorded, folded, counted (tokens) and summed up (a finished prompt's su
 | Why a turn failed: a refusal's category, a reply cut off at the output limit or the context window | Claude Code in VS Code (`claude-vscode/`) | `StopFailure` gives the API's error kind and details, which the extension draws, but no hook tells of a refusal or of a cut-off reply. |
 | What a compaction cost: the summarizing request's tokens, the messages before and after | Claude Code in VS Code (`claude-vscode/`) | `PreCompact` and `PostCompact` give the trigger, the instructions and the summary, and the transcript the size before and after; the summarizer's usage and the message counts are not in them. |
 | Model and token counts of a turn from the API itself, at once | Claude Code in VS Code (`claude-vscode/`) | The hooks carry neither. They are read from Claude Code's transcript (a format Claude Code does not document), which is written asynchronously, so a turn's figures show a moment after it ends, and may be missing if the format changes. A subagent's show once it has stopped (its transcript's path comes with its stop). |
-| `/call-tree` opens the pane (and `@calltree` as text) | Claude Code in VS Code (`claude-vscode/`) | Claude Code's extension is not a chat participant host. The view's own icon, and **Claude Call Tree: Open Call Tree**, open it. |
+| `/call-stack` opens the pane (and `@callstack` as text) | Claude Code in VS Code (`claude-vscode/`) | Claude Code's extension is not a chat participant host. The view's own icon, and **Agent Call Stack for Claude: Open Call Stack**, open it. |
+| `Thinking` and `Reply` rows live, as they stream | GitHub Copilot (`vscode/`) | Copilot's hooks carry none of it. They are read from VS Code's agent-host log, `~/.copilot/session-state/<session id>/events.jsonl` (undocumented; its `assistant.message` events hold `reasoningText` and `content`), once the hook that names it has fired: a prompt's end, a subagent's start or stop, a compaction. So a prompt's rows show after it ends, and may be missing if the format changes. Their time runs from the line before to the message. |
+| History (earlier chat) has `Thinking` and `Reply` rows | Claude Code (`claude/`) | The engine's message list (`$.session.messages()`) gives a message's whole text and its tool uses, not its blocks, and no times. Rows appear for what happens after the mod loads. |
+| `Thinking` and `Reply` rows live, as they stream | Claude Code in VS Code (`claude-vscode/`) | Hooks carry none of it; they are read from the transcript once written (a subagent's, once it has stopped). |
 | Details in a modal | Claude Code | The engine has no modal API: a pane is docked or inline, and a box placed over the rows is clipped to the pane. Details open inline under the row instead, with the same content and actions (input, output, sizes, who it ran with, show all, copy). |
-| Install step for hooks (`Call Tree: Install Copilot Hooks`) | Claude Code | Not needed: a Claude Code plugin loads its hooks itself. |
+| Install step for hooks (`Agent Call Stack: Install Copilot Hooks`) | Claude Code | Not needed: a Claude Code plugin loads its hooks itself. |
 | Hooks that need no install | Claude Code in VS Code (`claude-vscode/`) | Claude Code has no folder of hook files, so the extension merges its hooks into `~/.claude/settings.json` (or the workspace's `.claude/settings.local.json`) on a click, keeps a backup of the file the first time, and removes only its own entries. |
 | Cut-off replies as rows, the engine's verdict on every call, the cost of a compaction | Claude Code in VS Code (`claude-vscode/`) | Those come from the mod's engine events (`turn.step`, `tool.check`, `session.compact`), which a hook cannot see. |

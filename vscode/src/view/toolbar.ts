@@ -17,17 +17,17 @@ export const empty = (v: View): string => {
         <b>No calls yet</b>
         <p>Send a prompt to Copilot in agent mode and what it does shows up here, as a tree.</p>
         ${off}
-        <p class="dim">Nothing showing up? Start a new agent chat and check that <code>node</code> is on your PATH.</p>
+        <p class="dim">Nothing showing up? Start a new agent chat and check that <code>node</code> is installed (on Windows, on your PATH).</p>
       </div>`
   }
   return `<div class="empty">
-        <b>Call Tree is not set up yet</b>
+        <b>Agent Call Stack is not set up yet</b>
         <p>It reads what Copilot's agent does through hooks, and they are not installed. Install them once, then start a new agent chat.</p>
         <div class="actions">
           ${button('installUser', 'Install for all workspaces', '', 'primary')}
           ${v.hasWorkspace ? button('installWorkspace', 'This workspace only') : ''}
         </div>
-        <p class="dim">Needs <code>node</code> on your PATH. Agent hooks are a preview feature of VS Code. ${setting}</p>
+        <p class="dim">The hooks run with <code>node</code>, or with VS Code itself when there is none (not on Windows, where <code>node</code> must be on your PATH). Agent hooks are a preview feature of VS Code. ${setting}</p>
       </div>`
 }
 
@@ -60,7 +60,7 @@ export const toolbar = (c: Ctx): string => {
 
 // How many prompts, and how many calls run, are done or failed.
 export const summary = (c: Ctx): string => {
-  const everyCall = c.prompts.flatMap(p => c.below(p)).filter(n => n.kind !== 'event')
+  const everyCall = c.prompts.flatMap(p => c.below(p)).filter(n => n.kind !== 'event' && n.kind !== 'note')
   const total = {
     ok: everyCall.filter(n => n.status === 'ok').length,
     err: everyCall.filter(n => n.status === 'err').length,

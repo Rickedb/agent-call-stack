@@ -38,12 +38,15 @@ export type Perm = {
 /** One compaction of the conversation: what set it off, and (from the transcript) its size before and after, in tokens. */
 export type Compact = { trigger: string; before?: number; after?: number }
 
-/** One row of the tree: a prompt, a subagent, a tool call, or something that happened to them. */
+/**
+ * One row of the tree: a prompt, a subagent, a tool call, something that happened to them, or a note: what
+ * the model wrote between calls (its `Thinking`, when it returned any, and its `Reply`), read from the transcript.
+ */
 export type Node = {
   id: string
   parent?: string
-  kind: 'prompt' | 'agent' | 'tool' | 'event'
-  /** The short name: a tool's, an agent's type, `Prompt`. */
+  kind: 'prompt' | 'agent' | 'tool' | 'event' | 'note'
+  /** The short name: a tool's, an agent's type, `Prompt`; for a note, `Thinking` or `Reply`. */
   name: string
   /** What it was given, in a few words: a command, a path, a task. */
   arg: string

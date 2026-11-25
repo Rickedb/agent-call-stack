@@ -1,7 +1,8 @@
 import { historyNodes, type HistPrompt } from './history'
 import type { Ev, EvKind, Node } from './types'
 
-export const MAX_NODES = 300
+// A prompt's thinking and replies are a row each, between its calls.
+export const MAX_NODES = 800
 
 /** What the prompt is called that the hooks began in the middle of, before the transcript says what it was. */
 const EARLIER = '(earlier activity)'
@@ -116,6 +117,17 @@ export class Session {
     }
     this.nodes = [...rows, ...this.nodes]
     for (const n of rows) this.byId.set(n.id, n)
+  }
+
+  /**
+   * Adds the notes the transcript has (what the model wrote between calls) that are not rows yet; one whose
+   * prompt or subagent is not in the tree is left out. Calling it again with the same notes changes nothing.
+   */
+  addNotes(notes: Node[]): void {
+    for (const n of notes) {
+      if (this.byId.has(n.id) || !n.parent || !this.byId.has(n.parent)) continue
+      this.add(n)
+    }
   }
 
   /** The first prompt, to tell sessions apart. */

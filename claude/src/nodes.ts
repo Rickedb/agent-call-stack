@@ -62,7 +62,7 @@ export async function keep(
   try {
     const home = await $.env.get('HOME')
     if (home) {
-      const path = `${home}/.claude/ai-call-stack/${id.replace(/[^\w.-]/g, '_')}.${which}.txt`
+      const path = `${home}/.claude/agent-call-stack/${id.replace(/[^\w.-]/g, '_')}.${which}.txt`
       await $.fs.write(path, text.slice(0, FILE_MAX))
       fields[`${which}File`] = path
     }
@@ -78,6 +78,6 @@ export async function guard($: EngineInterface, what: string, fn: () => Promise<
   try {
     await fn()
   } catch (err) {
-    $.ui.toast(`Call tree: ${what}: ${err instanceof Error ? err.message : String(err)}`)
+    $.ui.toast(`Agent Call Stack: ${what}: ${err instanceof Error ? err.message : String(err)}`)
   }
 }

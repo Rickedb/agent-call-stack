@@ -4,16 +4,16 @@ import { PANE } from './config'
 import { backfill } from './history'
 import { readClosed, readNodes, setClosed } from './state'
 
-// Opening the pane at session start, the `/call-tree` command that opens it
+// Opening the pane at session start, the `/call-stack` command that opens it
 // again, and the button above the prompt that does the same once it is closed.
 export const lifecycle = (on: On) => {
   on('session.start', async ($, e, next) => {
     await $.command.register({
-      name: 'call-tree',
-      description: 'Show the calling tree of this session in a pane',
+      name: 'call-stack',
+      description: 'Show the call stack of this session in a pane',
     })
     await setClosed($, false)
-    void $.ui.open({ id: PANE, title: 'Call tree' })
+    void $.ui.open({ id: PANE, title: 'Agent Call Stack' })
 
     // Running bars grow with the clock: redraw once a second while any runs.
     $.clock.every(1000, async () => {
@@ -26,10 +26,10 @@ export const lifecycle = (on: On) => {
     return out
   })
 
-  on('command.run', { command: 'call-tree' }, async $ => {
+  on('command.run', { command: 'call-stack' }, async $ => {
     await setClosed($, false)
-    await $.ui.open({ id: PANE, title: 'Call tree' })
-    return { text: 'Call tree pane opened.' }
+    await $.ui.open({ id: PANE, title: 'Agent Call Stack' })
+    return { text: 'Agent Call Stack pane opened.' }
   })
 
   // A pane the person closed leaves a button above the prompt to open it again.
@@ -46,13 +46,13 @@ export const lifecycle = (on: On) => {
     return (
       <Box gap={1}>
         <Button
-          key="open-call-tree"
+          key="open-call-stack"
           onPress={async () => {
             await setClosed($, false)
-            await $.ui.open({ id: PANE, title: 'Call tree' })
+            await $.ui.open({ id: PANE, title: 'Agent Call Stack' })
           }}
         >
-          Open call tree
+          Open call stack
         </Button>
         {running.length ? <Text color="warning">● {running.length} running</Text> : null}
       </Box>

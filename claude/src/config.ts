@@ -1,5 +1,6 @@
-export const PANE = 'ai-call-stack'
-export const MAX_NODES = 300
+export const PANE = 'agent-call-stack'
+// A prompt's thinking and replies are a row each, between its calls.
+export const MAX_NODES = 800
 // What the state keeps of one text. Longer text goes whole to a file.
 export const KEEP = 8000
 // History is kept shorter still: it can be a hundred calls at once.

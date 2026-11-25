@@ -36,12 +36,12 @@ const basic = () =>
 
 test('before the hooks are installed the panel says so and offers the buttons', () => {
   const html = renderBody(undefined, view({ hooksInstalled: false }))
-  assert.match(html, /Call Tree is not set up yet/)
+  assert.match(html, /Agent Call Stack is not set up yet/)
   assert.match(html, /data-act="installUser"[^>]*>Add to your settings</)
   assert.match(html, /data-act="installWorkspace"[^>]*>This workspace only/)
   // And where to look if it still does not work.
   assert.match(html, /data-act="openSettings"/)
-  assert.match(html, /node<\/code> on your PATH/)
+  assert.match(html, /or with VS Code itself when there is none/)
 })
 
 test('with no folder open there is no workspace button', () => {

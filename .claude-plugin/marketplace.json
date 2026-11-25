@@ -1,12 +1,13 @@
 {
-  "name": "ai-call-stack-local",
+  "name": "agent-call-stack-local",
   "owner": {
     "name": "local"
   },
   "plugins": [
     {
-      "name": "ai-call-stack",
-      "source": "./claude"
+      "name": "agent-call-stack",
+      "source": "./claude",
+      "description": "A live pane beside the chat that shows what Claude is doing as a call stack: prompts, thinking and replies, subagents and tool calls, with status, duration, models and tokens."
     }
   ]
 }

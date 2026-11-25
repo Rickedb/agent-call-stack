@@ -12,12 +12,12 @@ export type Touch = {
   changes?: { path: string; added: number; removed: number }[]
 }
 
-/** One row of the tree: a prompt, a subagent, or a tool call. */
+/** One row of the tree: a prompt, a subagent, a tool call, or transcript-derived thinking/reply text. */
 export type Node = {
   id: string
   parent?: string
-  kind: 'prompt' | 'agent' | 'tool' | 'event'
-  /** The short name: a tool's, an agent's type, `Prompt`. */
+  kind: 'prompt' | 'agent' | 'tool' | 'event' | 'note'
+  /** The short name: a tool's, an agent's type, `Prompt`, or `Thinking` / `Reply`. */
   name: string
   /** What it was given, in a few words: a command, a path, a task. */
   arg: string

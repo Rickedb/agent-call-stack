@@ -58,8 +58,11 @@ export type Touch = {
 export type Node = {
   id: string
   parent?: string
-  /** A row that is neither work nor a loop but something that happened to it: a compaction, an error. */
-  kind: 'prompt' | 'agent' | 'tool' | 'event'
+  /**
+   * A row that is neither work nor a loop but something that happened to it (a compaction, an error), or a
+   * note: what the model wrote between calls, its `Thinking` (when it returned any) and its `Reply`.
+   */
+  kind: 'prompt' | 'agent' | 'tool' | 'event' | 'note'
   /** The short name: a tool's, an agent's type, `Prompt`. */
   name: string
   /** What it was given, in a few words: a command, a path, a task. */
@@ -99,7 +102,7 @@ export type Node = {
 
 declare module 'claude-code' {
   interface PluginState {
-    'ai-call-stack': {
+    'agent-call-stack': {
       nodes: Shaped<Node[]>
       /** The id of the prompt now running (or last run). */
       root: Shaped<string>

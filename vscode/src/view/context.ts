@@ -11,6 +11,8 @@ export const index = (list: Node[]) => {
   for (const n of list) {
     if (n.parent && ids.has(n.parent)) kids.set(n.parent, [...(kids.get(n.parent) ?? []), n])
   }
+  // Transcript notes are read after the calls the hooks saw; draw every parent's children in time order.
+  for (const [id, children] of kids) kids.set(id, children.slice().sort((a, b) => a.start - b.start))
   const below = (n: Node): Node[] => (kids.get(n.id) ?? []).flatMap(c => [c, ...below(c)])
   return { kids, below }
 }
@@ -48,5 +50,5 @@ export const timesOf = (c: Ctx, top: Node): { t0: number; t1: number } => {
 
 export const slowestOf = (c: Ctx, top: Node): Node | undefined =>
   [top, ...c.below(top)]
-    .filter(n => n.kind !== 'prompt' && n.kind !== 'event' && n.status !== 'run')
+    .filter(n => n.kind !== 'prompt' && n.kind !== 'event' && n.kind !== 'note' && n.status !== 'run')
     .sort((a, b) => span(b, c.v.now) - span(a, c.v.now))[0]

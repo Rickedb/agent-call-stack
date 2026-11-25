@@ -3,7 +3,7 @@ import * as fs from 'node:fs'
 import { HIST_BYTES, readHistory } from './history'
 import type { Session } from './model'
 import type { Node, Usage } from './types'
-import { fmtTokens } from './view/format'
+import { clip, fmtTokens } from './view/format'
 
 /**
  * Claude Code's hooks carry no model and no token counts, but each session keeps a transcript (the path
@@ -16,6 +16,27 @@ import { fmtTokens } from './view/format'
 /** One API response: when, the model that answered, what it used. */
 export type Reply = { t: number; side: boolean; model?: string; usage?: Usage }
 
+/** What the model wrote in one content block between calls: its thinking, or a piece of its reply. */
+export type Note = {
+  id: string
+  name: 'Thinking' | 'Reply'
+  /** When the block was written (it ends the block), and when the line before it was: the model's time on it. */
+  start: number
+  t: number
+  side: boolean
+  /** The text, cut at NOTE_KEEP characters, and its whole length. */
+  text: string
+  len: number
+}
+
+/** How much of a note's text is kept: the transcript holds the whole of it. */
+export const NOTE_KEEP = 8000
+
+/** The longest a block can be taken to have run: a longer gap is a wait for something else. */
+const NOTE_MAX_MS = 30 * 60_000
+
+const STAMP = /"timestamp":"([^"]+)"/
+
 /** A compaction the transcript records, with the conversation's size before and after, in tokens. */
 export type Boundary = { t: number; trigger: string; before?: number; after?: number }
 
@@ -26,9 +47,13 @@ const isRec = (v: unknown): v is Record<string, unknown> => typeof v === 'object
 export class Parsed {
   replies: Reply[] = []
   boundaries: Boundary[] = []
+  notes: Note[] = []
   offset = 0
   private rest = ''
   private byId = new Map<string, Reply>()
+  private seen = new Set<string>()
+  /** When the last line of the main loop, and of a subagent's (a sidechain), was written. */
+  private last = { main: 0, side: 0 }
 
   /** Reads more of the transcript's text: lines that are whole count, the last half line waits. */
   feed(chunk: string): void {
@@ -45,6 +70,12 @@ export class Parsed {
   private line(line: string): void {
     // Most lines are not ours (attachments, file history, requests): skip them without parsing.
     const isReply = line.includes('"type":"assistant"')
+    // A tool result or a prompt is written when the model's next block can begin: it times that block.
+    if (!isReply && line.includes('"type":"user"')) {
+      const at = Date.parse(STAMP.exec(line)?.[1] ?? '')
+      if (Number.isFinite(at)) this.last[line.includes('"isSidechain":true') ? 'side' : 'main'] = at
+      return
+    }
     if (!isReply && !line.includes('compact_boundary')) return
     let o: unknown
     try {
@@ -80,6 +111,7 @@ export class Parsed {
     // An error the client made up is no response of a model.
     const model = typeof m.model === 'string' && !m.model.startsWith('<') ? m.model : undefined
     const reply: Reply = { t, side: o.isSidechain === true, model, usage }
+    this.notesOf(o, m, t, reply.side, model)
 
     // A response is written once per content block, with the same usage (as far as it had streamed).
     const id = typeof m.id === 'string' ? m.id : undefined
@@ -103,6 +135,35 @@ export class Parsed {
     if (id) this.byId.set(id, reply)
     this.replies.push(reply)
   }
+
+  // The thinking and the text of one line of a response: each block is a line of its own.
+  private notesOf(o: Record<string, unknown>, m: Record<string, unknown>, t: number, side: boolean, model?: string): void {
+    const from = this.last[side ? 'side' : 'main']
+    this.last[side ? 'side' : 'main'] = t
+    // A message the client made up is no answer of the model's.
+    if (model === undefined && typeof m.model === 'string') return
+    if (!Array.isArray(m.content)) return
+    const uuid = typeof o.uuid === 'string' ? o.uuid : String(t)
+    m.content.forEach((b, i) => {
+      if (!isRec(b)) return
+      const isThought = b.type === 'thinking'
+      const text = isThought ? b.thinking : b.type === 'text' ? b.text : undefined
+      if (typeof text !== 'string' || !text.trim()) return
+      const id = `n:${uuid}:${i}`
+      if (this.seen.has(id)) return
+      this.seen.add(id)
+      const start = from > 0 && from <= t && t - from < NOTE_MAX_MS ? from : t
+      this.notes.push({
+        id,
+        name: isThought ? 'Thinking' : 'Reply',
+        start,
+        t,
+        side,
+        text: text.slice(0, NOTE_KEEP),
+        len: text.length,
+      })
+    })
+  }
 }
 
 const sum = (replies: Reply[]): Usage | undefined => {
@@ -125,6 +186,20 @@ const lastModel = (replies: Reply[]): string | undefined =>
 /** How far from a compaction's row a transcript's boundary may be and still be it. */
 const NEAR_MS = 120_000
 
+/** The row a note is drawn as, under the prompt or the subagent whose loop wrote it. */
+const noteRow = (n: Note, parent: string): Node => ({
+  id: n.id,
+  parent,
+  kind: 'note',
+  name: n.name,
+  arg: clip(n.text, 160),
+  status: 'ok',
+  start: n.start,
+  end: n.t,
+  output: n.text,
+  outputLen: n.len,
+})
+
 /**
  * Names the model and the usage of the prompts the hooks recorded, from the main transcript: a response
  * belongs to the prompt it came after (the next prompt's start ends it). A subagent has a transcript of
@@ -132,6 +207,7 @@ const NEAR_MS = 120_000
  */
 export const assign = (s: Session, main: Parsed | undefined, agents: Map<string, Parsed>): void => {
   const prompts = s.nodes.filter(n => n.kind === 'prompt')
+  const notes: Node[] = []
   if (main) {
     const own = main.replies.filter(r => !r.side)
     prompts.forEach((p, i) => {
@@ -141,6 +217,9 @@ export const assign = (s: Session, main: Parsed | undefined, agents: Map<string,
       const mine = own.filter(r => r.t >= from && r.t < to)
       p.model = lastModel(mine) ?? p.model
       p.usage = sum(mine)
+      for (const note of main.notes) {
+        if (!note.side && note.t >= from && note.t < to) notes.push(noteRow(note, p.id))
+      }
     })
     const used = new Set<Boundary>()
     for (const row of s.nodes.filter(n => n.kind === 'event' && n.name === 'Compact')) {
@@ -161,7 +240,9 @@ export const assign = (s: Session, main: Parsed | undefined, agents: Map<string,
     if (!t) continue
     a.model = lastModel(t.replies) ?? a.model
     a.usage = sum(t.replies)
+    for (const note of t.notes) notes.push(noteRow(note, a.id))
   }
+  s.addNotes(notes)
 }
 
 /** Reads the transcripts of the sessions it is asked about, a little at a time: they are long, and only grow. */

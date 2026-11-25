@@ -4,11 +4,11 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { test } from 'node:test'
 
-import { buildHookConfig, EVENTS, hookFile, installHookFile, installRecorder, removeHookFile } from '../hooks'
+import { runtime, buildHookConfig, EVENTS, hookFile, installHookFile, installRecorder, removeHookFile } from '../hooks'
 import { EventStore } from '../store'
 import type { Ev } from '../types'
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'call-tree-'))
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'call-stack-'))
 const line = (e: Partial<Ev>) => JSON.stringify({ v: 1, t: 1, sid: 's', kind: 'prompt', arg: 'hi', ...e }) + '\n'
 
 test('the store reads what grows, and waits for the end of a half-written line', () => {
@@ -67,12 +67,12 @@ test('clearing deletes the logs of the sessions given', () => {
 })
 
 test('the hook config has one command per event, with paths safe for any shell', () => {
-  const config = buildHookConfig('C:\\Users\\me\\.copilot\\ai-call-stack\\record.cjs')
+  const config = buildHookConfig('C:\\Users\\me\\.copilot\\agent-call-stack\\record.cjs')
   assert.equal(config.version, 1)
   assert.deepEqual(Object.keys(config.hooks), [...EVENTS])
   const entry = config.hooks.PreToolUse?.[0]
   assert.equal(entry?.type, 'command')
-  assert.equal(entry?.command, 'node "C:/Users/me/.copilot/ai-call-stack/record.cjs" PreToolUse')
+  assert.equal(entry?.command, 'node "C:/Users/me/.copilot/agent-call-stack/record.cjs" PreToolUse')
   assert.equal(entry?.timeoutSec, 5)
 })
 
@@ -84,7 +84,7 @@ test('the installer copies the recorder and writes and removes the hook file', (
   assert.equal(fs.readFileSync(recorder, 'utf8'), '// recorder')
 
   const file = hookFile('workspace', dir) as string
-  assert.equal(file, path.join(dir, '.github', 'hooks', 'ai-call-stack.json'))
+  assert.equal(file, path.join(dir, '.github', 'hooks', 'agent-call-stack.json'))
   installHookFile(file, recorder)
   const written = JSON.parse(fs.readFileSync(file, 'utf8')) as ReturnType<typeof buildHookConfig>
   assert.match(written.hooks.Stop?.[0]?.command ?? '', /record\.cjs" Stop$/)
@@ -92,4 +92,24 @@ test('the installer copies the recorder and writes and removes the hook file', (
   assert.equal(removeHookFile(file), true)
   assert.equal(removeHookFile(file), false)
   assert.equal(hookFile('workspace'), undefined)
+})
+
+test('the hook command runs the node it is given, quoted, so a shell without a version manager finds it', () => {
+  const config = buildHookConfig('/r/record.cjs', { exe: '/home/me/.local/share/mise/shims/node' })
+  assert.equal(config.hooks.Stop?.[0]?.command, '"/home/me/.local/share/mise/shims/node" "/r/record.cjs" Stop')
+})
+
+test('the hooks run VS Code as node when asked, and node by its full path otherwise', () => {
+  const electron = runtime(true)
+  assert.equal(electron.electron, true)
+  assert.equal(electron.exe, process.execPath)
+  const node = runtime(false)
+  assert.ok(node.electron || path.isAbsolute(node.exe))
+})
+
+test('an electron runtime sets ELECTRON_RUN_AS_NODE in the command', () => {
+  assert.equal(
+    buildHookConfig('/r/record.cjs', { exe: '/usr/share/code/code', electron: true }).hooks.Stop?.[0]?.command,
+    'ELECTRON_RUN_AS_NODE=1 "/usr/share/code/code" "/r/record.cjs" Stop',
+  )
 })

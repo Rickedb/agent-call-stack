@@ -43,7 +43,7 @@ export function toolbar($: EngineInterface, c: Pane) {
 // How many prompts, and how many calls run, are done or failed.
 export const summary = (c: Pane) => {
   const { Box, Text } = c.els
-  const everyCall = c.prompts.flatMap(p => c.below(p)).filter(n => n.kind !== 'event')
+  const everyCall = c.prompts.flatMap(p => c.below(p)).filter(n => n.kind !== 'event' && n.kind !== 'note')
   const total = {
     ok: everyCall.filter(n => n.status === 'ok').length,
     err: everyCall.filter(n => n.status === 'err').length,

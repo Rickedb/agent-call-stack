@@ -1,8 +1,9 @@
+import { execFileSync } from 'node:child_process'
 import * as fs from 'node:fs'
 import * as os from 'node:os'
 import * as path from 'node:path'
 
-/** The hook events the call tree listens to. */
+/** The hook events the call stack listens to. */
 export const EVENTS = [
   'SessionStart',
   'SessionEnd',
@@ -21,7 +22,7 @@ export const EVENTS = [
 ] as const
 
 /** The folder the recorder lives in; a hook whose command names it is ours. */
-export const MARK = 'ai-call-stack-vscode'
+export const MARK = 'agent-call-stack-vscode'
 
 export const claudeHome = (): string => process.env.CLAUDE_CONFIG_DIR || path.join(os.homedir(), '.claude')
 
@@ -55,11 +56,81 @@ type Entry = { matcher?: unknown; hooks?: unknown }
 
 const isRec = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const isOurs = (h: unknown): boolean =>
-  isRec(h) && typeof h.command === 'string' && /ai-call-stack-vscode[\\/]record\.cjs/.test(h.command)
+  isRec(h) && typeof h.command === 'string' && /agent-call-stack-vscode[\\/]record\.cjs/.test(h.command)
+
+let nodeFound: string | undefined | null = null
+
+/** What a hook runs the recorder with: a `node`, or VS Code's own executable run as node. */
+export type Runtime = { exe: string; electron?: boolean }
+
+const NODE: Runtime = { exe: 'node' }
+
+/**
+ * What the hooks run the recorder with. A hook is started by a plain, non-interactive shell, which has
+ * not read the person's shell config, so a `node` that a version manager (mise, nvm, fnm, volta) adds to
+ * PATH there is not found ("node: command not found"). So node is looked up here and written in full.
+ * When `electron` is set, or no node can be found, it is VS Code's own executable run as node
+ * (`ELECTRON_RUN_AS_NODE=1`), which needs no install. Windows always gets a bare `node`: the variable
+ * is set differently in each of its shells.
+ */
+export const runtime = (electron = false): Runtime => {
+  if (process.platform === 'win32') return NODE
+  if (!electron) {
+    if (nodeFound === null) nodeFound = findNode()
+    if (nodeFound) return { exe: nodeFound }
+  }
+  return { exe: process.execPath, electron: true }
+}
+
+const findNode = (): string | undefined => {
+  const isExe = (f: string): boolean => {
+    try {
+      fs.accessSync(f, fs.constants.X_OK)
+      return fs.statSync(f).isFile()
+    } catch {
+      return false
+    }
+  }
+  const home = os.homedir()
+  const dirs = [
+    ...(process.env.PATH ?? '').split(path.delimiter),
+    path.join(home, '.local', 'share', 'mise', 'shims'),
+    path.join(home, '.asdf', 'shims'),
+    path.join(home, '.volta', 'bin'),
+    path.join(home, '.local', 'bin'),
+    '/opt/homebrew/bin',
+    '/usr/local/bin',
+    '/usr/bin',
+  ].filter(Boolean)
+  for (const d of dirs) {
+    const f = path.join(d, 'node')
+    if (isExe(f)) return f
+  }
+  // Last: ask the person's own shell, which has their version manager set up.
+  try {
+    const shell = process.env.SHELL || '/bin/sh'
+    const out = execFileSync(shell, ['-lic', 'command -v node'], {
+      encoding: 'utf8',
+      timeout: 3000,
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+    const last = out.trim().split('\n').pop()?.trim() ?? ''
+    if (path.isAbsolute(last) && isExe(last)) return last
+  } catch {
+    // Fall through.
+  }
+  return undefined
+}
+
+/** The command word for a runtime: quoted when it is a path, which may have spaces. */
+const runWord = (rt: Runtime): string =>
+  rt.exe === 'node' && !rt.electron
+    ? 'node'
+    : `${rt.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}"${rt.exe.replace(/\\/g, '/')}"`
 
 /** The command a hook runs: the recorder, told which event it is. Forward slashes work in bash, PowerShell and cmd alike. */
-export const commandFor = (recorder: string, event: string): string =>
-  `node "${recorder.replace(/\\/g, '/')}" ${event}`
+export const commandFor = (recorder: string, event: string, rt: Runtime = NODE): string =>
+  `${runWord(rt)} "${recorder.replace(/\\/g, '/')}" ${event}`
 
 // Everything of ours out of one event's list, and the entries that were only ours with it.
 const withoutOurs = (list: unknown): unknown[] => {
@@ -78,7 +149,7 @@ const withoutOurs = (list: unknown): unknown[] => {
 }
 
 /** The settings with our hook for each event, and whatever else was there left alone. */
-export const withHooks = (settings: Settings, recorder: string): Settings => {
+export const withHooks = (settings: Settings, recorder: string, rt: Runtime = NODE): Settings => {
   const hooks: Record<string, unknown> = isRec(settings.hooks) ? { ...settings.hooks } : {}
   for (const event of Object.keys(hooks)) {
     const rest = withoutOurs(hooks[event])
@@ -87,7 +158,7 @@ export const withHooks = (settings: Settings, recorder: string): Settings => {
   }
   for (const event of EVENTS) {
     const rest = Array.isArray(hooks[event]) ? (hooks[event] as unknown[]) : []
-    hooks[event] = [...rest, { hooks: [{ type: 'command', command: commandFor(recorder, event), timeout: 5 }] }]
+    hooks[event] = [...rest, { hooks: [{ type: 'command', command: commandFor(recorder, event, rt), timeout: 5 }] }]
   }
   return { ...settings, hooks }
 }
@@ -126,15 +197,15 @@ export const readSettings = (file: string): Settings => {
 const write = (file: string, settings: Settings): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true })
   // The first time a file that was there is touched, keep what it was.
-  const backup = `${file}.ai-call-stack.bak`
+  const backup = `${file}.agent-call-stack.bak`
   if (fs.existsSync(file) && !fs.existsSync(backup)) fs.copyFileSync(file, backup)
-  const tmp = `${file}.ai-call-stack.tmp`
+  const tmp = `${file}.agent-call-stack.tmp`
   fs.writeFileSync(tmp, JSON.stringify(settings, null, 2) + '\n')
   fs.renameSync(tmp, file)
 }
 
-export const installHookFile = (file: string, recorder: string): void => {
-  write(file, withHooks(readSettings(file), recorder))
+export const installHookFile = (file: string, recorder: string, rt: Runtime = NODE): void => {
+  write(file, withHooks(readSettings(file), recorder, rt))
 }
 
 /** Takes our hooks out of a settings file; says whether there were any. */
@@ -158,10 +229,10 @@ export const hooksInstalledIn = (file: string): boolean => {
  * Brings our hooks in a settings file up to the events listened to now, so that an update that listens to
  * more needs no reinstall. Only a file that has them already is touched. Says whether it changed one.
  */
-export const refreshHookFile = (file: string, recorder: string): boolean => {
+export const refreshHookFile = (file: string, recorder: string, rt: Runtime = NODE): boolean => {
   if (!hooksInstalledIn(file)) return false
   const before = readSettings(file)
-  const after = withHooks(before, recorder)
+  const after = withHooks(before, recorder, rt)
   if (JSON.stringify(before) === JSON.stringify(after)) return false
   write(file, after)
   return true

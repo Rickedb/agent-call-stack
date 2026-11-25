@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import { EventStore } from '../store'
 import type { Ev } from '../types'
 
-const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'call-tree-'))
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'call-stack-'))
 const line = (e: Partial<Ev>) => JSON.stringify({ v: 1, t: 1, sid: 's', kind: 'prompt', arg: 'hi', ...e }) + '\n'
 
 test('the store reads what grows, and waits for the end of a half-written line', () => {

@@ -32,7 +32,8 @@ export const modal = (c: Ctx, n: Node): string => {
       <div class="modal-body">
         ${n.arg ? `<div class="modal-arg">${esc(n.arg)}</div>` : ''}
         <div class="dim">started +${dur(n.start - t0)} · took ${dur(took)} · ${Math.min(100, Math.round((took / t1) * 100))}% of prompt</div>
-        <div class="dim">input ${tokText(n, 'input')} · output ${tokText(n, 'output')}</div>
+        <div class="dim">${n.kind === 'note' ? `${n.name === 'Thinking' ? 'the model\'s thinking' : 'what the model wrote'} between calls · ${tokText(n, 'output')}` : `input ${tokText(n, 'input')} · output ${tokText(n, 'output')}`}</div>
+        ${n.kind === 'note' ? '<div class="dim">read from the transcript: its time is the model\'s, from the line before it to this one</div>' : ''}
         ${model && n.kind !== 'event' ? `<div class="dim">${n.model ? 'model' : 'called by'} ${esc(modelName(model))}</div>` : ''}
         ${n.why && n.kind !== 'event' ? `<div class="tint-err">why: ${esc(n.why)}</div>` : ''}
         ${n.compact ? `<div class="dim">${esc(compactLine(n.compact))}</div>` : ''}

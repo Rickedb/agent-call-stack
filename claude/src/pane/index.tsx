@@ -84,7 +84,7 @@ export const pane = (on: On) => {
       return (
         <Box flexDirection="column" gap={1}>
           <Text color="error" bold>
-            The call tree could not be drawn
+            The call stack could not be drawn
           </Text>
           <Text dimColor>{err instanceof Error ? err.message : String(err)}</Text>
         </Box>

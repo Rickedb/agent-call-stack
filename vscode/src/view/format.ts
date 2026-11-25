@@ -46,17 +46,20 @@ export const tokText = (n: Node, which: 'input' | 'output'): string => {
 }
 
 const KIND_ICON = { prompt: '💬', agent: '🤖', tool: '🔧' } as const
+const NOTE_ICON: Record<string, string> = { Thinking: '🧠', Reply: '🗨️' }
 // What a tool call did, when it is known: a shell command has the terminal's prompt, a file call the
 // icon of reading, editing or writing. Any other call keeps the tool's own.
-const TOOL_ICON: Record<string, string> = { run: '❯_', read: '📖', edit: '✏️', write: '📝', search: '🔍', web: '🌐' }
+const TOOL_ICON: Record<string, string> = { run: '❯_', read: '📖', edit: '✏️', write: '📝', search: '🔍', web: '🌐', mcp: '🔌' }
 export const icon = (n: Node): string =>
   n.kind === 'event'
     ? n.name === 'Compact'
       ? '🗜️'
       : '⚠️'
-    : n.kind === 'tool'
-      ? (TOOL_ICON[toolOp(n) ?? ''] ?? KIND_ICON.tool)
-      : KIND_ICON[n.kind]
+    : n.kind === 'note'
+      ? (NOTE_ICON[n.name] ?? '💭')
+      : n.kind === 'tool'
+        ? (TOOL_ICON[toolOp(n) ?? ''] ?? KIND_ICON.tool)
+        : KIND_ICON[n.kind]
 export const mark = (n: Node): string => (n.status === 'run' ? '●' : n.status === 'ok' ? '✓' : '✗')
 export const statusWord = (n: Node): string => (n.status === 'run' ? 'Running' : n.status === 'ok' ? 'Done' : 'Failed')
 
@@ -70,7 +73,9 @@ export const tint = (n: Node): string =>
         ? 'prompt'
         : n.kind === 'agent'
           ? 'agent'
-          : 'tool'
+          : n.kind === 'note'
+            ? 'note'
+            : 'tool'
 
 export const span = (n: Node, now: number): number => (n.end ?? now) - n.start
 

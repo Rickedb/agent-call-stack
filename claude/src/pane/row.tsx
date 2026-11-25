@@ -79,7 +79,7 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
             <Button key={`open:${node.id}`} plain onPress={() => void toggleSelected($, node.id)}>
               {c.isWaterfall ? null : <Text color={tint(node)}>{mark(node)} </Text>}
               {icon ? <Text dimColor>{`${icon} `}</Text> : null}
-              <Text bold={isPicked || (node.kind !== 'tool' && node.kind !== 'event')} wrap="truncate-end">
+              <Text bold={isPicked || (node.kind !== 'tool' && node.kind !== 'event' && node.kind !== 'note')} wrap="truncate-end">
                 {name}
               </Text>
               {c.isWaterfall && isFailed ? <Text color="error">{` ${mark(node)}`}</Text> : null}

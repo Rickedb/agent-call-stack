@@ -92,5 +92,10 @@ test('a call has the icon of what it did, and an unmapped call keeps the tool ic
   // Mapped by what the call touched, not by name: an unknown tool and one that touched nothing keep the tool's.
   assert.equal(op('other'), '🔧')
   assert.equal(icon(call({ name: 'TodoWrite', touch: undefined })), '🔧')
+  // A tool an MCP server gave the agent has its own, whatever it touched (Claude Code's `mcp__` names, Copilot's `mcp_`).
+  assert.equal(icon(call({ name: 'mcp__github__search', touch: undefined })), '🔌')
+  assert.equal(icon(call({ name: 'mcp__fs__read', touch: { op: 'read', paths: ['/a'] } })), '🔌')
+  assert.equal(icon(call({ name: 'mcp_github_search_issues', touch: undefined })), '🔌')
+  assert.equal(icon(call({ name: 'mcpish', touch: undefined })), '🔧')
   assert.equal(icon({ ...call({}), kind: 'prompt' }), '💬')
 })

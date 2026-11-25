@@ -41,7 +41,11 @@ export function details($: EngineInterface, c: Pane, n: Node, t0: number, t1: nu
             {Math.min(100, Math.round((c.span(n) / t1) * 100))}% of prompt
           </Text>
         )}
-        <Text dimColor>{`input ${tokText(n, 'input')} · output ${tokText(n, 'output')}`}</Text>
+        <Text dimColor>
+          {n.kind === 'note'
+            ? `${n.name === 'Thinking' ? "the model's thinking" : 'what the model wrote'} between calls · ${tokText(n, 'output')}`
+            : `input ${tokText(n, 'input')} · output ${tokText(n, 'output')}`}
+        </Text>
         {n.usage ? (
           <Text dimColor>
             {`reported in ${tokExact(n.usage.input + n.usage.cacheRead + n.usage.cacheWrite)} (${tokExact(n.usage.cacheRead)} cached) · out ${tokExact(n.usage.output)} ${n.kind === 'prompt' ? '· subagents not included' : ''}`.trim()}

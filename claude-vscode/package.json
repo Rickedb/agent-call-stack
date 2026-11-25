@@ -1,10 +1,20 @@
 {
-  "name": "ai-call-stack-claude",
-  "displayName": "AI Call Stack for Claude Code",
-  "description": "A live pane showing what Claude Code is doing as a call tree: prompt, subagents, tool calls, with status, duration, tokens, models, approvals, errors and compactions.",
+  "name": "agent-call-stack-claude",
+  "displayName": "Agent Call Stack for Claude",
+  "description": "See what Claude Code is doing as a live call stack: prompts, the model's thinking and replies, subagents and tool calls, as a tree or a waterfall with status, duration, models, tokens, approvals, errors and compactions.",
   "version": "0.1.0",
   "publisher": "local",
+  "icon": "media/icon.png",
   "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Rickedb/agent-call-stack.git",
+    "directory": "claude-vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/Rickedb/agent-call-stack/issues"
+  },
+  "homepage": "https://github.com/Rickedb/agent-call-stack#readme",
   "private": true,
   "engines": {
     "vscode": "^1.95.0"
@@ -22,49 +32,49 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "aiCallStackClaude",
-          "title": "Claude Call Tree",
+          "id": "agentCallStackClaude",
+          "title": "Agent Call Stack for Claude",
           "icon": "media/icon.svg"
         }
       ]
     },
     "views": {
-      "aiCallStackClaude": [
+      "agentCallStackClaude": [
         {
           "type": "webview",
-          "id": "aiCallStackClaude.view",
-          "name": "Call Tree"
+          "id": "agentCallStackClaude.view",
+          "name": "Call Stack"
         }
       ]
     },
     "commands": [
       {
-        "command": "aiCallStackClaude.open",
-        "title": "Open Call Tree",
-        "category": "Claude Call Tree"
+        "command": "agentCallStackClaude.open",
+        "title": "Open Call Stack",
+        "category": "Agent Call Stack for Claude"
       },
       {
-        "command": "aiCallStackClaude.installHooks",
+        "command": "agentCallStackClaude.installHooks",
         "title": "Add Hooks to Claude Code Settings",
-        "category": "Claude Call Tree",
+        "category": "Agent Call Stack for Claude",
         "icon": "$(plug)"
       },
       {
-        "command": "aiCallStackClaude.uninstallHooks",
+        "command": "agentCallStackClaude.uninstallHooks",
         "title": "Remove Hooks from Claude Code Settings",
-        "category": "Claude Call Tree"
+        "category": "Agent Call Stack for Claude"
       },
       {
-        "command": "aiCallStackClaude.clear",
+        "command": "agentCallStackClaude.clear",
         "title": "Clear Recorded Calls",
-        "category": "Claude Call Tree",
+        "category": "Agent Call Stack for Claude",
         "icon": "$(clear-all)"
       }
     ],
     "configuration": {
-      "title": "AI Call Stack for Claude Code",
+      "title": "Agent Call Stack for Claude",
       "properties": {
-        "aiCallStackClaude.defaultView": {
+        "agentCallStackClaude.defaultView": {
           "type": "string",
           "enum": [
             "tree",
@@ -72,24 +82,29 @@
           ],
           "default": "waterfall",
           "description": "How the rows draw at first: a tree of duration bars, or a waterfall on a time axis."
+        },
+        "agentCallStackClaude.useElectronAsNode": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Run the hooks with VS Code's own executable as node (`ELECTRON_RUN_AS_NODE=1`) instead of a `node` found on this machine. Off by default: `node` is used directly, with its full path, and VS Code is the fallback when no `node` is found. Not used on Windows. Reload the window after changing it."
         }
       }
     },
     "menus": {
       "view/title": [
         {
-          "command": "aiCallStackClaude.clear",
-          "when": "view == aiCallStackClaude.view",
+          "command": "agentCallStackClaude.clear",
+          "when": "view == agentCallStackClaude.view",
           "group": "navigation@1"
         },
         {
-          "command": "aiCallStackClaude.installHooks",
-          "when": "view == aiCallStackClaude.view",
+          "command": "agentCallStackClaude.installHooks",
+          "when": "view == agentCallStackClaude.view",
           "group": "9_hooks@1"
         },
         {
-          "command": "aiCallStackClaude.uninstallHooks",
-          "when": "view == aiCallStackClaude.view",
+          "command": "agentCallStackClaude.uninstallHooks",
+          "when": "view == agentCallStackClaude.view",
           "group": "9_hooks@2"
         }
       ]
@@ -105,5 +120,22 @@
     "@types/node": "^22.0.0",
     "@types/vscode": "1.95.0",
     "typescript": "^5.6.0"
+  },
+  "keywords": [
+    "claude",
+    "claude code",
+    "anthropic",
+    "agent",
+    "call stack",
+    "trace",
+    "hooks",
+    "subagents",
+    "tool calls",
+    "tokens",
+    "observability"
+  ],
+  "galleryBanner": {
+    "color": "#1f1f1f",
+    "theme": "dark"
   }
 }

@@ -7,7 +7,7 @@
  * It appends one normalized line to the session's event log and prints `{}`.
  * It must never get in the way of the work: it never denies, never blocks, and
  * swallows every error. Keep this file free of imports from the extension: it
- * is copied on its own to ~/.copilot/ai-call-stack/record.cjs.
+ * is copied on its own to ~/.copilot/agent-call-stack/record.cjs.
  */
 import * as crypto from 'node:crypto'
 import * as fs from 'node:fs'
@@ -25,7 +25,7 @@ const RETENTION_MS = 14 * 24 * 3600 * 1000
 type Rec = Record<string, unknown>
 
 export const dataDir = (): string =>
-  process.env.AI_CALL_STACK_DIR || path.join(os.homedir(), '.copilot', 'ai-call-stack')
+  process.env.AGENT_CALL_STACK_DIR || path.join(os.homedir(), '.copilot', 'agent-call-stack')
 
 export const clip = (s: string, n: number): string => {
   const one = s.replace(/\s+/g, ' ').trim()
@@ -334,7 +334,7 @@ const KINDS: Record<string, EvKind> = {
 }
 
 // The chat's own commands are not work worth drawing.
-const SELF = /^\s*(@calltree|\/call-tree)\b/i
+const SELF = /^\s*(@callstack|\/call-stack)\b/i
 
 const fingerprint = (tool: string, args: Rec): string =>
   crypto.createHash('sha1').update(`${tool}\0${JSON.stringify(args)}`).digest('hex').slice(0, 12)

@@ -227,7 +227,7 @@ test('each prompt gets the model and usage of the responses that came after it; 
 })
 
 test('the reader goes on from where it was, starts again on a file that shrank, and says nothing of a missing one', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'call-tree-'))
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'call-stack-'))
   const file = path.join(dir, 't.jsonl')
   const r = new TranscriptReader()
   assert.equal(r.read(file), undefined)
@@ -380,4 +380,100 @@ test('the details of a shell call show its commands as a tree, each joined by it
   // A line of one command has no tree.
   const single = s.nodes.find(n => n.arg === 'y')!
   assert.doesNotMatch(renderBody(s, view({ selected: single.id })), /class="seq"/)
+})
+
+// ---- what the model wrote between calls ----
+
+const block = (uuid: string, t: string, content: object[], over: object = {}) =>
+  JSON.stringify({ type: 'assistant', uuid, timestamp: t, message: { id: `m-${uuid}`, model: 'claude-opus-5-5', content }, ...over })
+const userLine = (t: string, over: object = {}) => JSON.stringify({ type: 'user', timestamp: t, message: { content: 'x' }, ...over })
+const T = (s: string) => Date.parse(`2026-01-01T00:00:${s}Z`)
+
+test('the transcript gives the thinking and the text between calls, timed from the line before', () => {
+  const p = new Parsed()
+  p.feed(
+    [
+      userLine('2026-01-01T00:00:00.000Z'),
+      block('u1', '2026-01-01T00:00:02.000Z', [{ type: 'thinking', thinking: 'Where is the config read?', signature: 'x' }]),
+      block('u2', '2026-01-01T00:00:03.000Z', [{ type: 'text', text: "I'll read the file." }]),
+      block('u3', '2026-01-01T00:00:03.500Z', [{ type: 'tool_use', id: 't1', name: 'Read', input: {} }]),
+      // Thinking the model returned empty (a signature only) is nothing to show.
+      block('u4', '2026-01-01T00:00:04.000Z', [{ type: 'thinking', thinking: '', signature: 'y' }]),
+      // The same line read twice, and a message the client made up, add nothing.
+      block('u2', '2026-01-01T00:00:03.000Z', [{ type: 'text', text: "I'll read the file." }]),
+      block('u5', '2026-01-01T00:00:04.500Z', [{ type: 'text', text: 'No response requested.' }], { message: { id: 'q', model: '<synthetic>', content: [{ type: 'text', text: 'No response requested.' }] } }),
+      userLine('2026-01-01T00:00:05.000Z'),
+      block('u6', '2026-01-01T00:00:07.000Z', [{ type: 'text', text: 'x'.repeat(9000) }]),
+      userLine('2026-01-01T00:00:08.000Z', { isSidechain: true }),
+      block('u7', '2026-01-01T00:00:09.000Z', [{ type: 'text', text: 'a subagent speaking' }], { isSidechain: true }),
+    ].join('\n') + '\n',
+  )
+  assert.deepEqual(
+    p.notes.map(n => [n.name, n.start, n.t, n.side, n.len]),
+    [
+      ['Thinking', T('00.000'), T('02.000'), false, 25],
+      ['Reply', T('02.000'), T('03.000'), false, 19],
+      ['Reply', T('05.000'), T('07.000'), false, 9000],
+      ['Reply', T('08.000'), T('09.000'), true, 19],
+    ],
+  )
+  assert.equal(p.notes[2]?.text.length, 8000)
+})
+
+const withNotes = () => {
+  const s = run(
+    ev(T('00.000'), { kind: 'prompt', arg: 'fix it' }),
+    ev(T('04.000'), { kind: 'tool_pre', tool: 'Read', toolUseId: 't1', arg: 'a.ts' }),
+    ev(T('05.000'), { kind: 'tool_post', tool: 'Read', toolUseId: 't1', output: 'code' }),
+    ev(T('08.000'), { kind: 'stop', output: 'done' }),
+  )
+  const main = new Parsed()
+  main.feed(
+    [
+      userLine('2026-01-01T00:00:00.000Z'),
+      block('u1', '2026-01-01T00:00:02.000Z', [{ type: 'thinking', thinking: 'Where is the config read?' }]),
+      block('u2', '2026-01-01T00:00:03.000Z', [{ type: 'text', text: "I'll read the file." }]),
+      userLine('2026-01-01T00:00:05.000Z'),
+      block('u6', '2026-01-01T00:00:07.000Z', [{ type: 'text', text: 'It reads from a.ts.' }]),
+    ].join('\n') + '\n',
+  )
+  return { s, main }
+}
+
+test('the notes become rows under their prompt, once, in the order things happened', () => {
+  const { s, main } = withNotes()
+  assign(s, main, new Map())
+  assign(s, main, new Map())
+  const notes = s.nodes.filter(n => n.kind === 'note')
+  assert.equal(notes.length, 3)
+  const prompt = s.nodes.find(n => n.kind === 'prompt') as Node
+  assert.ok(notes.every(n => n.parent === prompt.id && n.status === 'ok'))
+  assert.deepEqual(
+    [notes[0]?.name, notes[0]?.arg, notes[0]?.output, notes[0]?.start, notes[0]?.end],
+    ['Thinking', 'Where is the config read?', 'Where is the config read?', T('00.000'), T('02.000')],
+  )
+
+  // The view puts them among the calls by time, and counts none of them as a call.
+  const html = renderBody(s, view({ mode: 'tree' }))
+  const at = (word: string) => html.indexOf(word)
+  assert.ok(at('Thinking') > 0 && at('Thinking') < at('Read') && at('Read') < at('It reads from a.ts.'))
+  assert.match(html, /1 prompt/)
+  assert.equal(reportOf(prompt, s.nodes.filter(n => n.parent === prompt.id), T('10.000'))?.calls, 1)
+})
+
+test('a note opens in the details with its text, named for what it is; a subagent has its own', () => {
+  const { s, main } = withNotes()
+  s.apply(ev(T('09.000'), { kind: 'agent_start', agentId: 'ag', agentType: 'Explore' }))
+  s.apply(ev(T('12.000'), { kind: 'agent_stop', agentId: 'ag', agentType: 'Explore', agentTranscript: '/t/agent.jsonl' }))
+  const agent = new Parsed()
+  agent.feed(userLine('2026-01-01T00:00:09.000Z') + '\n' + block('s1', '2026-01-01T00:00:11.000Z', [{ type: 'text', text: 'Found it in b.ts.' }]) + '\n')
+  assign(s, main, new Map([['/t/agent.jsonl', agent]]))
+  const sub = byName(s, 'Explore') as Node
+  const mine = s.nodes.find(n => n.kind === 'note' && n.parent === sub.id) as Node
+  assert.equal(mine.output, 'Found it in b.ts.')
+  const thought = s.nodes.find(n => n.name === 'Thinking') as Node
+  const html = renderBody(s, view({ selected: thought.id }))
+  assert.match(html, /THINKING/)
+  assert.match(html, /the model's thinking between calls/)
+  assert.match(html, /Where is the config read\?/)
 })
