@@ -47,6 +47,14 @@ Part of [Agent Call Stack](https://github.com/Rickedb/agent-call-stack#readme), 
   <img src="../docs/images/claude-code/summary.png" width="560" alt="The summary of the finished prompt">
 </p>
 
+## What it does on your machine
+
+The mod watches what Claude does and draws it; it never changes what Claude does.
+
+- **Hooks, and what they decide.** None of them decides anything. They record and pass the event on unchanged (`return next(e)`): `session.start`, `turn.start`, `turn.step`, `turn.complete`, `agent.spawn`, `tool.call`, `session.compact` and the `classic.*` hooks (`PostToolUse`, `PostToolUseFailure`, `PermissionDenied`, `Stop`, `SubagentStop`, `StopFailure`, `PostCompact`) build the rows. `tool.check` only reads the verdict Claude's own permission check gave (allow, ask or deny, and the rule) to show it next to the call; it returns that verdict as it came, so the mod never allows, asks or denies a call. `ui.render` draws the pane. On start it also reads the chat's earlier messages from the session, to show the prompts that came before. `ui.close` notes that you closed the pane, to show a button that opens it again, and `command.run` answers `/call-stack`.
+- **Files it writes.** One kind, and only for text that is too long to keep in the pane (over 8,000 characters): the whole text of a call's input or output, up to 1 MB, in `~/.claude/agent-call-stack/<row id>.<input|output>.txt`, so *Show all* and *Copy* can give you all of it. To find that folder it reads the `HOME` environment variable. It does not edit any build, start-up, settings or instructions file, and it writes nothing else.
+- **What it does not do.** No network calls, no shell commands, no changes to your project, and nothing is sent anywhere.
+
 ## Good to know
 
 - Details open inline, under the row (the engine has no modal API; the VS Code extensions use a modal).
