@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test and package (${{ matrix.ext }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ext: [vscode, claude-vscode]
+    defaults:
+      run:
+        working-directory: ${{ matrix.ext }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.ext }}/package-lock.json
+
+      - run: npm ci
+      - run: npm test
+
+      # Proves the extension still packs; nothing is published here.
+      - run: npx --yes @vscode/vsce@3 package --no-dependencies -o ../${{ matrix.ext }}.vsix
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.ext }}-vsix
+          path: ${{ matrix.ext }}.vsix
+          retention-days: 7
+
+  plugin:
+    name: Test (claude plugin)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # The plugin's tests run on Claude Code's own test runner.
+      - run: npm install -g @anthropic-ai/claude-code
+      - run: claude plugin test claude

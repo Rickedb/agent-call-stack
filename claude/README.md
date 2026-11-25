@@ -5,8 +5,8 @@ A live "Agent Call Stack" pane beside the Claude Code chat, as a Claude Code mod
 Part of [Agent Call Stack](https://github.com/Rickedb/agent-call-stack#readme), which also has the same view for [Claude Code in VS Code](https://github.com/Rickedb/agent-call-stack/tree/master/claude-vscode#readme) and [GitHub Copilot](https://github.com/Rickedb/agent-call-stack/tree/master/vscode#readme).
 
 <p align="center">
-  <img src="docs/images/waterfall.png" width="410" alt="The waterfall: one bar per row on a shared time axis, the subagent's calls nested under it">
-  <img src="docs/images/tree.png" width="410" alt="The tree: the same rows with status marks and guide lines">
+  <img src="../docs/images/claude-code/waterfall.png" width="410" alt="The waterfall: one bar per row on a shared time axis, the subagent's calls nested under it">
+  <img src="../docs/images/claude-code/tree.png" width="410" alt="The tree: the same rows with status marks and guide lines">
 </p>
 <p align="center"><sub>Real screenshots of the pane in a Claude Code terminal session: Claude fixing a failing test in a small demo project, with an Explore subagent. Nothing is mocked.</sub></p>
 
@@ -38,13 +38,13 @@ Part of [Agent Call Stack](https://github.com/Rickedb/agent-call-stack#readme), 
 **A row's details** open inline, under the row you click: its state and timing, the size of its input and output, who it ran with, and the input and output themselves (here, a `Read` of the file with the bug).
 
 <p align="center">
-  <img src="docs/images/details.png" width="560" alt="A Read call's details, open inline under its row">
+  <img src="../docs/images/claude-code/details.png" width="560" alt="A Read call's details, open inline under its row">
 </p>
 
 **The summary** ends each finished prompt: calls, failures and time, a line per tool, the slowest and heaviest call, the models, the tokens the API counted with the cache split, and how many calls ran unasked or were asked about. Its **Copy** button puts it on the clipboard as markdown.
 
 <p align="center">
-  <img src="docs/images/summary.png" width="560" alt="The summary of the finished prompt">
+  <img src="../docs/images/claude-code/summary.png" width="560" alt="The summary of the finished prompt">
 </p>
 
 ## Good to know

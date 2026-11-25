@@ -1,7 +1,7 @@
 {
-  "name": "agent-call-stack-local",
+  "name": "agent-call-stack",
   "owner": {
-    "name": "local"
+    "name": "rickedb"
   },
   "plugins": [
     {

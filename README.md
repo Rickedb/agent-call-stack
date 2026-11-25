@@ -12,7 +12,7 @@ It exists for three agents, with the same features in each:
 </p>
 <p align="center"><sub>Left: GitHub Copilot in VS Code. Right: Claude Code in VS Code, which also shows the model, the tokens the API counted and the approvals. The same made-up session in both, drawn by the extensions' own code.</sub></p>
 <p align="center">
-  <img src="claude/docs/images/waterfall.png" width="460" alt="The Claude Code mod's pane in a terminal session">
+  <img src="docs/images/claude-code/waterfall.png" width="460" alt="The Claude Code mod's pane in a terminal session">
 </p>
 <p align="center"><sub>Claude Code in the terminal (the mod): a real screenshot of its pane during a real session, fixing a bug in a demo project.</sub></p>
 
@@ -379,7 +379,7 @@ ELECTRON=/path/to/electron node scripts/screenshots/shots.cjs
 
 `ELECTRON` is an Electron binary: your distro's `electron`, or the one `npm i -D electron` installs. The images are kept out of the `.vsix` (`.vscodeignore`); the Marketplace page loads them from the repository.
 
-**The Claude Code mod.** Its pictures (`claude/docs/images/`) are real screenshots, not renders: a terminal draws the pane, so the only faithful picture is the terminal's own. They were taken by running Claude Code with the plugin (`claude --plugin-dir claude`) in a terminal window on the small demo project in [`scripts/screenshots/demo/shop-api`](scripts/screenshots/demo/shop-api) (a real failing test: a token's expiry compared in the wrong unit), with the prompt *"Use an Explore subagent to find where login tokens expire, then fix the failing login test, add a regression test in tests/login.regression.test.js, and run npm test."* Then a screenshot of the pane for each view (**Tree**, **Waterfall**, a row's details, the summary scrolled into view). Copy the demo folder somewhere short first and `git init` it (a short path keeps the file paths in the rows readable), and use an opaque terminal background.
+**The Claude Code mod.** Its pictures (`docs/images/claude-code/`, outside `claude/` so they are not installed with the plugin) are real screenshots, not renders: a terminal draws the pane, so the only faithful picture is the terminal's own. They were taken by running Claude Code with the plugin (`claude --plugin-dir claude`) in a terminal window on the small demo project in [`scripts/screenshots/demo/shop-api`](scripts/screenshots/demo/shop-api) (a real failing test: a token's expiry compared in the wrong unit), with the prompt *"Use an Explore subagent to find where login tokens expire, then fix the failing login test, add a regression test in tests/login.regression.test.js, and run npm test."* Then a screenshot of the pane for each view (**Tree**, **Waterfall**, a row's details, the summary scrolled into view). Copy the demo folder somewhere short first and `git init` it (a short path keeps the file paths in the rows readable), and use an opaque terminal background.
 
 ## Icons
 

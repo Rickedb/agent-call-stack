@@ -1,0 +1,132 @@
+name: Publish extensions
+
+# Publishes both VS Code extensions to the Visual Studio Marketplace
+# (and to Open VSX, when OVSX_PAT is set), and attaches the .vsix files
+# to a GitHub release.
+#
+#   Release:  git tag v0.1.0 && git push origin v0.1.0
+#             The tag must equal the version in vscode/package.json and
+#             claude-vscode/package.json (without the "v").
+#   Manual:   Actions > Publish extensions > Run workflow. Pick which one
+#             to publish, or tick "dry run" to build and package only.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which extension to publish
+        type: choice
+        options: [both, vscode, claude-vscode]
+        default: both
+      dry_run:
+        description: Build and package only, publish nothing
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build (${{ matrix.ext }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        ext: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.target != 'both' && format('["{0}"]', inputs.target) || '["vscode","claude-vscode"]') }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.ext }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ${{ matrix.ext }}/package-lock.json
+
+      - name: Check publisher and version
+        run: |
+          node - <<'EOF'
+          const p = require('./package.json');
+          const fail = (m) => { console.error('::error::' + m); process.exit(1); };
+          if (!p.publisher || p.publisher === 'local')
+            fail(`package.json "publisher" is "${p.publisher}"; set it to your Marketplace publisher ID.`);
+          const ref = process.env.GITHUB_REF;
+          if (ref.startsWith('refs/tags/v') && ref.slice('refs/tags/v'.length) !== p.version)
+            fail(`Tag ${ref} does not match package.json version ${p.version}.`);
+          console.log(`${p.publisher}.${p.name}@${p.version}`);
+          EOF
+
+      - run: npm ci
+      - run: npm test
+
+      - name: Package
+        run: npx --yes @vscode/vsce@3 package --no-dependencies -o ../${{ matrix.ext }}.vsix
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.ext }}-vsix
+          path: ${{ matrix.ext }}.vsix
+          if-no-files-found: error
+
+  publish:
+    name: Publish (${{ matrix.ext }})
+    needs: build
+    # Not on a manual dry run.
+    if: github.event_name == 'push' || !inputs.dry_run
+    runs-on: ubuntu-latest
+    # Add required reviewers to this environment to gate every publish.
+    environment: marketplace
+    strategy:
+      fail-fast: false
+      matrix:
+        ext: ${{ fromJSON(github.event_name == 'workflow_dispatch' && inputs.target != 'both' && format('["{0}"]', inputs.target) || '["vscode","claude-vscode"]') }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.ext }}-vsix
+
+      - name: Publish to the Visual Studio Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: npx --yes @vscode/vsce@3 publish --packagePath ${{ matrix.ext }}.vsix
+
+      - name: Publish to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          if [ -z "$OVSX_PAT" ]; then
+            echo "OVSX_PAT is not set, skipping Open VSX."
+            exit 0
+          fi
+          npx --yes ovsx@0 publish ${{ matrix.ext }}.vsix
+
+  release:
+    name: GitHub release
+    needs: publish
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: "*-vsix"
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: "*.vsix"
+          generate_release_notes: true
