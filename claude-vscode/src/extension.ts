@@ -13,6 +13,7 @@ import {
   removeHookFile,
   runtime,
   type Runtime,
+  withLauncher,
   settingsFile,
   type Scope,
 } from './hooks'
@@ -223,14 +224,14 @@ export function activate(ctx: vscode.ExtensionContext): void {
   const provider = new CallStackView(ctx, store)
   const recorderSource = ctx.asAbsolutePath(path.join('out', 'record.js'))
   // What the hooks run the recorder with: node, or VS Code itself as node when the setting is on.
-  const node = (): Runtime => runtime(vscode.workspace.getConfiguration('agentCallStackClaude').get<boolean>('useElectronAsNode') === true)
+  const node = (recorder: string): Runtime => withLauncher(runtime(vscode.workspace.getConfiguration('agentCallStackClaude').get<boolean>('useElectronAsNode') === true), recorder, dataDir())
 
   // The recorder the hooks run is a copy; keep it as new as the extension.
   if (hooksInstalled()) {
     try {
       const recorder = installRecorder(recorderSource, dataDir())
       // ...and the settings list every event it records.
-      for (const f of settingsFiles()) refreshHookFile(f, recorder, node())
+      for (const f of settingsFiles()) refreshHookFile(f, recorder, node(recorder))
     } catch {
       // The copy there keeps working.
     }
@@ -269,7 +270,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
     if (!file) return
     try {
       const recorder = installRecorder(recorderSource, dataDir())
-      installHookFile(file, recorder, node())
+      installHookFile(file, recorder, node(recorder))
     } catch (err) {
       void vscode.window.showErrorMessage(`Agent Call Stack: could not add the hooks to ${file}: ${String(err)}`)
       return
@@ -285,7 +286,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
       if (answer === 'Remove them there') removeHookFile(other)
     }
     void vscode.window.showInformationMessage(
-      `Agent Call Stack hooks added to ${file}. Send a prompt to Claude Code (a session already open picks them up on its next start). If nothing shows up, check that node is installed (on Windows, on your PATH) and that settings do not turn hooks off (disableAllHooks).`,
+      `Agent Call Stack hooks added to ${file}. Send a prompt to Claude Code (a session already open picks them up on its next start). If nothing shows up, check that node is installed and that settings do not turn hooks off (disableAllHooks).`,
     )
     provider.render()
   }

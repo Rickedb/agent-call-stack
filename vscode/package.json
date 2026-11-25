@@ -3,9 +3,9 @@
   "displayName": "Agent Call Stack for Copilot",
   "description": "See what GitHub Copilot's agent is doing as a live call stack: prompts, the model's thinking and replies, subagents and tool calls, as a tree or a waterfall with status, duration and token sizes.",
   "version": "0.1.0",
-  "publisher": "local",
+  "publisher": "rickedb",
   "icon": "media/icon.png",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/Rickedb/agent-call-stack.git",
@@ -93,7 +93,7 @@
         "agentCallStack.useElectronAsNode": {
           "type": "boolean",
           "default": false,
-          "markdownDescription": "Run the hooks with VS Code's own executable as node (`ELECTRON_RUN_AS_NODE=1`) instead of a `node` found on this machine. Off by default: `node` is used directly, with its full path, and VS Code is the fallback when no `node` is found. Not used on Windows. Reload the window after changing it."
+          "markdownDescription": "Run the hooks with VS Code's own executable as node (`ELECTRON_RUN_AS_NODE=1`) instead of a `node` found on this machine. Off by default: `node` is used directly, with its full path, and VS Code is the fallback when no `node` is found. On Windows it goes through a small `record.cmd` launcher. Reload the window after changing it."
         }
       }
     },
@@ -143,5 +143,8 @@
   "galleryBanner": {
     "color": "#1f1f1f",
     "theme": "dark"
+  },
+  "sponsor": {
+    "url": "https://github.com/sponsors/rickedb"
   }
 }

@@ -56,12 +56,12 @@ type Entry = { matcher?: unknown; hooks?: unknown }
 
 const isRec = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
 const isOurs = (h: unknown): boolean =>
-  isRec(h) && typeof h.command === 'string' && /agent-call-stack-vscode[\\/]record\.cjs/.test(h.command)
+  isRec(h) && typeof h.command === 'string' && /agent-call-stack-vscode[\\/]record\.c(?:js|md)/.test(h.command)
 
 let nodeFound: string | undefined | null = null
 
 /** What a hook runs the recorder with: a `node`, or VS Code's own executable run as node. */
-export type Runtime = { exe: string; electron?: boolean }
+export type Runtime = { exe: string; electron?: boolean; launcher?: string }
 
 const NODE: Runtime = { exe: 'node' }
 
@@ -70,11 +70,14 @@ const NODE: Runtime = { exe: 'node' }
  * not read the person's shell config, so a `node` that a version manager (mise, nvm, fnm, volta) adds to
  * PATH there is not found ("node: command not found"). So node is looked up here and written in full.
  * When `electron` is set, or no node can be found, it is VS Code's own executable run as node
- * (`ELECTRON_RUN_AS_NODE=1`), which needs no install. Windows always gets a bare `node`: the variable
- * is set differently in each of its shells.
+ * (`ELECTRON_RUN_AS_NODE=1`), which needs no install. On Windows that goes through a launcher
+ * (see `withLauncher`), and a `node` is only looked for on PATH, where a bare `node` finds it.
  */
-export const runtime = (electron = false): Runtime => {
-  if (process.platform === 'win32') return NODE
+export const runtime = (electron = false, platform: string = process.platform): Runtime => {
+  if (platform === 'win32') {
+    const onPath = (process.env.PATH ?? '').split(path.delimiter).some(d => d && fs.existsSync(path.join(d, 'node.exe')))
+    return !electron && onPath ? NODE : { exe: process.execPath, electron: true }
+  }
   if (!electron) {
     if (nodeFound === null) nodeFound = findNode()
     if (nodeFound) return { exe: nodeFound }
@@ -128,9 +131,32 @@ const runWord = (rt: Runtime): string =>
     ? 'node'
     : `${rt.electron ? 'ELECTRON_RUN_AS_NODE=1 ' : ''}"${rt.exe.replace(/\\/g, '/')}"`
 
+/**
+ * On Windows, VS Code itself run as node needs `ELECTRON_RUN_AS_NODE` set, which each of its shells does
+ * differently. So a small `record.cmd` sets it and runs the recorder, and the hook names that file alone:
+ * a bare path with an argument runs the same in cmd, PowerShell and Git Bash. A bare path cannot hold a
+ * space, so when the data folder has one (a user name with a space) the launcher goes to ProgramData.
+ * Any other runtime is returned as it came.
+ */
+export const withLauncher = (rt: Runtime, recorder: string, dir: string, platform: string = process.platform): Runtime => {
+  if (platform !== 'win32' || !rt.electron) return rt
+  const where = /\s/.test(dir) ? path.join(process.env.ProgramData ?? 'C:\\ProgramData', path.basename(dir)) : dir
+  const file = path.join(where, 'record.cmd')
+  const q = (s: string): string => s.replace(/%/g, '%%')
+  fs.mkdirSync(where, { recursive: true })
+  fs.writeFileSync(file, ['@echo off', 'set ELECTRON_RUN_AS_NODE=1', `"${q(rt.exe)}" "${q(recorder)}" %*`, ''].join('\r\n'))
+  return { ...rt, launcher: file }
+}
+
+/** The command a hook runs for an event: the launcher alone, or the runtime, the recorder and the event. */
+const commandLine = (rt: Runtime, script: string, event: string): string =>
+  rt.launcher
+    ? `${rt.launcher.replace(/\\/g, '/')} ${event}`
+    : `${runWord(rt)} "${script.replace(/\\/g, '/')}" ${event}`
+
 /** The command a hook runs: the recorder, told which event it is. Forward slashes work in bash, PowerShell and cmd alike. */
 export const commandFor = (recorder: string, event: string, rt: Runtime = NODE): string =>
-  `${runWord(rt)} "${recorder.replace(/\\/g, '/')}" ${event}`
+  commandLine(rt, recorder, event)
 
 // Everything of ours out of one event's list, and the entries that were only ours with it.
 const withoutOurs = (list: unknown): unknown[] => {

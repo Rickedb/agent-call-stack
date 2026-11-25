@@ -4,7 +4,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { test } from 'node:test'
 
-import { runtime, buildHookConfig, EVENTS, hookFile, installHookFile, installRecorder, removeHookFile } from '../hooks'
+import { withLauncher, runtime, buildHookConfig, EVENTS, hookFile, installHookFile, installRecorder, removeHookFile } from '../hooks'
 import { EventStore } from '../store'
 import type { Ev } from '../types'
 
@@ -112,4 +112,53 @@ test('an electron runtime sets ELECTRON_RUN_AS_NODE in the command', () => {
     buildHookConfig('/r/record.cjs', { exe: '/usr/share/code/code', electron: true }).hooks.Stop?.[0]?.command,
     'ELECTRON_RUN_AS_NODE=1 "/usr/share/code/code" "/r/record.cjs" Stop',
   )
+})
+
+test('on Windows the Electron runtime goes through a record.cmd launcher that the hook names alone', () => {
+  const dir = tmp()
+  const rt = withLauncher({ exe: 'C:\\Program Files\\Code\\Code.exe', electron: true }, 'C:\\Users\\me\\data\\record.cjs', dir, 'win32')
+  const launcher = rt.launcher as string
+  assert.equal(launcher, path.join(dir, 'record.cmd'))
+  const cmd = fs.readFileSync(launcher, 'utf8')
+  assert.equal(cmd, '@echo off\r\nset ELECTRON_RUN_AS_NODE=1\r\n"C:\\Program Files\\Code\\Code.exe" "C:\\Users\\me\\data\\record.cjs" %*\r\n')
+  assert.equal(buildHookConfig('C:\\Users\\me\\data\\record.cjs', rt).hooks.Stop?.[0]?.command, `${launcher.replace(/\\/g, '/')} Stop`)
+})
+
+test('a data folder with a space puts the launcher in ProgramData, which a bare path can name', () => {
+  const dir = tmp()
+  const spaced = path.join(dir, 'John Smith', 'agent-call-stack')
+  const before = process.env.ProgramData
+  process.env.ProgramData = path.join(dir, 'ProgramData')
+  try {
+    const rt = withLauncher({ exe: 'Code.exe', electron: true }, 'r.cjs', spaced, 'win32')
+    assert.equal(rt.launcher, path.join(dir, 'ProgramData', 'agent-call-stack', 'record.cmd'))
+    assert.ok(fs.existsSync(rt.launcher as string))
+  } finally {
+    if (before === undefined) delete process.env.ProgramData
+    else process.env.ProgramData = before
+  }
+})
+
+test('the launcher is only for Electron on Windows, and a % in a path is doubled for the batch file', () => {
+  const dir = tmp()
+  const node = { exe: 'node' }
+  assert.equal(withLauncher(node, 'r.cjs', dir, 'win32'), node)
+  const electron = { exe: '/usr/bin/code', electron: true }
+  assert.equal(withLauncher(electron, 'r.cjs', dir, 'linux'), electron)
+  const rt = withLauncher({ exe: 'C:\\100%\\Code.exe', electron: true }, 'r.cjs', dir, 'win32')
+  assert.match(fs.readFileSync(rt.launcher as string, 'utf8'), /"C:\\100%%\\Code\.exe"/)
+})
+
+test('on Windows a node on PATH is used bare, and with none the Electron runtime is', () => {
+  const dir = tmp()
+  const before = process.env.PATH
+  try {
+    process.env.PATH = dir
+    assert.equal(runtime(false, 'win32').electron, true)
+    fs.writeFileSync(path.join(dir, 'node.exe'), '')
+    assert.deepEqual(runtime(false, 'win32'), { exe: 'node' })
+    assert.equal(runtime(true, 'win32').electron, true)
+  } finally {
+    process.env.PATH = before
+  }
 })

@@ -2,29 +2,13 @@
 
 A live "Agent Call Stack" pane beside the Claude Code chat, as a Claude Code mod. It shows what Claude is doing like a stack trace: each prompt, what the model thought and replied between calls, the subagents it started and the tool calls inside them, with status, duration, the model, the tokens the API counted, what you were asked to approve, errors and compactions. Running calls are listed at the top as the current stack, innermost first. It draws as a tree or a waterfall, and a row opens its input and output inline.
 
-Part of [Agent Call Stack](../README.md), which also has the same view for [Claude Code in VS Code](../claude-vscode/README.md) and [GitHub Copilot](../vscode/README.md).
+Part of [Agent Call Stack](https://github.com/Rickedb/agent-call-stack#readme), which also has the same view for [Claude Code in VS Code](https://github.com/Rickedb/agent-call-stack/tree/master/claude-vscode#readme) and [GitHub Copilot](https://github.com/Rickedb/agent-call-stack/tree/master/vscode#readme).
 
-**The layout, as an illustration.** The pane is terminal text, so there is no screenshot here: this is drawn by hand to show the layout (the VS Code extensions' pictures are generated from their real code). Bars are boxes at the right end of each line; the real pane colors them and puts a colored status mark on each row.
-
-```
- Tree  Waterfall                                                        fold all
- 1 prompt   ✓ 8   ✗ 1
-
- Stack (innermost first)
-   at ❯_ npm test                                                          2.3s
-
- ▾ Prompt 1 opus-5-5  Fix the failing login test and add a…    ~2.9k tok   22.0s  ██████████████
-   ∴ Thinking  The login test fails on an expired token…            ~40 tok    1.1s  ▌
-   ▾ Explore haiku-5-5  find where login tokens expire                         6.8s    ▐████▌   slowest
-     ▸ ? Grep  expiresAt +2                                         ~31 tok   300ms    █
-     ▸ ≡ Read  src/auth/token.ts +1                                 ~23 tok   200ms    █
-   “ Reply  Found it: `isExpired` compares expiresAt in the wrong…  ~47 tok    2.3s       ▐██▌
-   ▸ ✎ Edit  src/auth/token.ts +1                                    ~6 tok   150ms          █
-   ▸ ❯_ npm test ✗  +1   asked, waited 700ms                        ~45 tok    2.2s            ██▌
-   ▸ ❯_ npm test +1                                                 ~52 tok    2.3s               ██▌
-
- ▾ Summary · 8 tool calls · 1 failed · took 22.0s · 53% of it in a call          Copy
-```
+<p align="center">
+  <img src="docs/images/waterfall.png" width="410" alt="The waterfall: one bar per row on a shared time axis, the subagent's calls nested under it">
+  <img src="docs/images/tree.png" width="410" alt="The tree: the same rows with status marks and guide lines">
+</p>
+<p align="center"><sub>Real screenshots of the pane in a Claude Code terminal session: Claude fixing a failing test in a small demo project, with an Explore subagent. Nothing is mocked.</sub></p>
 
 ## Getting started
 
@@ -38,99 +22,40 @@ Part of [Agent Call Stack](../README.md), which also has the same view for [Clau
 2. **Start a session.** The pane opens at session start. Run `/call-stack` to open it again.
 3. **Click a row** to open its details inline, under the row. (The engine has no modal API; the VS Code extensions open them in a modal. See `AGENTS.md`.)
 
-Rows draw in columns (output tokens, time) with a single colored status glyph. In the waterfall each call is one line, with its bar in a column at the right end, drawn with boxes (no text to wrap, whatever the surface's font); the bar column is a quarter of the width (8 to 32 cells) and is always there. A row's time badge is what the call itself took (a prompt's, its total), never the time elapsed before it: the bar shows where it started. A pane narrower than 72 columns gives up the "slowest" label first, and the name truncates last. The newest prompt is on top. When a prompt starts, the ones before it fold away (open any again with its arrow, or use *fold all* / *unfold all*).
+## What it shows
 
-## Reading the tree
+- Prompts, subagents and tool calls, nested as a tree or as bars on a time axis.
+- What the model thought and replied between calls.
+- The model each prompt and subagent ran on, and the tokens the API counted (with the cache split).
+- Which calls you were asked to approve, were refused, or ran unasked.
+- What each call involved (files, commands, searches, addresses), its duration, its output size and whether it failed.
+- A summary of every finished prompt, with a markdown copy; errors and compactions as rows of their own.
 
-- **Nesting.** A subagent is a row, and the calls it makes are its children. Guide lines (`├─ └─`) draw the branches. Neither Copilot's hooks nor the engine say which tool call started another, so a tool that calls other tools shows as siblings, not as parent and child; only subagents nest.
-- **What a call involved.** Under a tool call's row, in the tree and the waterfall, once you open it, one row for each thing it involved: a file (its name only, with what was done to it and, for an edit, its lines: `◦ login.ts edit +2 −1`), an address it fetched (`↗ x.dev/docs/auth fetch`, the scheme left off), the command it ran (`$ npm test run`), what it searched for (`? login search`). The rows have no time or bar of their own. A click on one opens inline under the row the whole path, address or command, what the call did, and every call of the prompt that involved the same one (each a button that opens that call's details), with their lines in all; *Open the call* goes to the call itself. They are shut until you open them: a call with something under it has an arrow (`▸`, and a `+2` after it counting them), and a click on it opens them (`▾`) or shuts them again; *fold all* shuts them too. Over eight, the rest are counted (`+3 more`). They are read from what each call was given, (see *What a call touched*), so they show while the call runs.
-- **What the model wrote between calls.** A `Thinking` row (`∴`) and a `Reply` row (`“`) sit in order among the calls, under the prompt or subagent whose loop wrote them: the text the model streams before it asks for a call ("I'll read the config first"), and its reasoning. They come from the `turn.step` stream, so a block shows as running from its first piece and settles when the step ends, with its whole text (its details show it, cut at 8,000 characters in the state and whole in a file beyond that). A row's time is how long the model took to write it, and its badge the text's estimated tokens. Thinking shows only when the model returns its text: some models and settings return a signature and no text, and then there is no row. They are not calls: the summary and the counts leave them out. What the chat held before the mod loaded (History) has none, since the engine's message list gives no per-block text or times.
-- **Names and icons.** A shell call is named by the first command it runs that is not a common call: `cd /app && npm test` is `npm` with `test` after it, and `cd`, `pushd`, `export`, `set`, `source`, `clear`, `Set-Location`, `$env:X = ...` and the like only say where or with what, so they are passed over (so are `VAR=x` settings before a program). A line that runs no program of its own is named by its shell: `bash`, or `pwsh` for a PowerShell call (by the tool's name, a cmdlet such as `Get-ChildItem`, or a `$env:` setting). The icon says what the call did: `❯_` for a command (the terminal's prompt), `≡` read, `✎` edit, `✚` write, `?` search, `↗` fetch, `◈` a tool an MCP server gave the agent (`mcp__server__tool`), whatever it touched (narrow characters, so the columns hold in every terminal); a call that touched nothing mapped keeps none. The summary still groups by the tool's own name.
-- **The commands of a shell call.** Its details list the commands of the line as a tree, names only, in the order they run: pipelines joined by `&&` (next runs if this succeeded), `||` (if it failed), `;` and `&` at the top, and each pipeline's later commands under the one that feeds them, after a `|` (or `|&`). Each operator has its own color, and a line under the tree says what the ones used mean. The common calls are dim. A line of one command shows no tree. Quotes and `$(...)` hide the operators inside them.
-- **Badges and copy.** A row's output size and time are badges (`~340 tok`, `400ms`). Each input and output text has a copy icon (`⧉`) in the top-right corner of its box, which copies the whole text; "Copy file path" and "Show all" stay as text buttons below it.
-- **Status marks.** The tree puts a glyph on every row (`✓` done, `●` running, `✗` failed). The waterfall does not: the color of a row's bar already says done or running, so only a failure keeps its `✗`, after the name.
-- **Parallel calls are not marked.** Neither the engine nor Copilot's hooks say which calls were started together, and overlap in time alone cannot tell parallel from coincidence, so the tree does not guess. In the waterfall, overlapping bars still show what ran at the same moment.
+## A tour
 
-## Tokens
+**Waterfall** and **Tree** are the two views at the top; the calls a subagent made nest under it. A call that waited for you to approve it says so (`asked, waited 2.0s`) and its bar starts when the tool ran, not when you were asked.
 
-Two kinds of figure, told apart in the pane:
+**A row's details** open inline, under the row you click: its state and timing, the size of its input and output, who it ran with, and the input and output themselves (here, a `Read` of the file with the bug).
 
-- **Reported** (`4.8k tok`, no `~`): what the API counted for a prompt's turn and for each subagent's own turns, from `turn.complete`. A row's details say it (`reported in 4.8k tok (4.0k tok cached) · out 520 tok`); a prompt's excludes its subagents, which have their own rows. The summary adds them up (input counts what the cache served and wrote too) and says how much came from the cache.
-- **Estimated** (`~340 tok`): what the API does not count per call, so a tool call's input and output, and the text of a prompt or subagent, at four characters a token from the whole text. Each row's output size and a row's details use these, and so does the summary's "Call text" line. A prompt with no reported usage (an interrupt, an API error) falls back to estimating all of it.
+<p align="center">
+  <img src="docs/images/details.png" width="560" alt="A Read call's details, open inline under its row">
+</p>
 
-The [Copilot port](../vscode/README.md) estimates everything: its hooks carry no usage.
+**The summary** ends each finished prompt: calls, failures and time, a line per tool, the slowest and heaviest call, the models, the tokens the API counted with the cache split, and how many calls ran unasked or were asked about. Its **Copy** button puts it on the clipboard as markdown.
 
-## Models
+<p align="center">
+  <img src="docs/images/summary.png" width="560" alt="The summary of the finished prompt">
+</p>
 
-A prompt and each subagent show the model they ran on, in color after their name (`Prompt 1 opus-5-5`; the date a model id carries is dropped). A prompt's model is read from its first model response and settled at its end, from what the API says answered (a fallback can change it). A subagent's is the one its spawn resolved to. A tool call has none of its own: its details say which model called it, the model of the prompt or subagent it ran in. A finished prompt's summary lists the models used. The [Copilot port](../vscode/README.md) shows the prompt's model only, read from VS Code's chat log, since its hooks carry none.
+## Good to know
 
-## What a call touched
+- Details open inline, under the row (the engine has no modal API; the VS Code extensions use a modal).
+- The chat's earlier messages are read in when the mod loads, as prompts and calls, without Thinking and Reply rows or exact times.
+- The same view exists for [Claude Code in VS Code](https://github.com/Rickedb/agent-call-stack/tree/master/claude-vscode#readme) and [GitHub Copilot](https://github.com/Rickedb/agent-call-stack/tree/master/vscode#readme).
 
-The resource rows under a tool call (see *Reading the tree*) are read from what the call was given, so they show while it runs: by the tool's name and the shape of its arguments (`file_path`, `command`, `url`, a list of edits...), so it also works for tools the mod has not seen. A call that touches nothing of these (a todo list, say) has no rows. The **lines** count what the call's arguments say: an edit counts the lines that differ between the text it replaces and its replacement (what the two share at the start and the end is left out), a file written whole counts as added only (the call does not say what was there), and a failed call counts for nothing. A change made by a shell command (`sed -i`, `git checkout`) is not counted.
-
-## Errors, compactions and approvals
-
-Three things that happen to the work, beside the calls themselves.
-
-- **Errors.** A prompt or a subagent that did not end in an answer says why, in red after its name (`interrupted`, `refused (category): ...`, or what the API said: `rate limited`, `API overloaded`, `billing error`, `hit the output limit`, with its details). A model reply cut off at the output limit or the context window is a failed `Error` row under the prompt. A failed call keeps its error as its output. The summary lists every failure (the prompt, subagents, calls, with the first line of each error), five at most.
-- **Compactions.** Each is a `Compact` row under the prompt it happened in (a manual `/compact` goes under the last prompt), from when it began to when it ended, with its trigger (`manual` or `auto`) and, when the engine says, `180k → 12k tok`. Its details give the messages before and after, what the summarizing request cost (reported), the instructions it was given (input) and the summary it left (output). The summary of the prompt adds them up: how many, how many tokens they saved, how long they took. A precomputation, which installs nothing, is not drawn.
-- **Approvals.** Each call carries the engine's verdict, from `tool.check`: a call put to you is tagged `asking you` while it waits, then `asked, waited 4.2s`; a call not allowed is tagged `denied` (a rule or the mode said no) or `not allowed` (you said no, or a classifier did). The details say which rule decided and why. A call you were asked about is drawn from when the tool ran (the engine reports it, with the wait and the hooks left out), so its time and bar are the tool's, and the wait is told apart: the summary says how many calls were allowed, asked or not allowed, and how long you were waited on in all.
-
-Compaction and error rows count as neither calls nor failed calls in the pane's totals.
-
-## Transcript
-
-A prompt's details give the path of the conversation's transcript file (from the `Stop` hook, so once the turn ends), and a subagent's its own (from `SubagentStop`), with a button that copies it. A running row has none yet. The VS Code port does the same with what Copilot's hooks give.
-
-## Summary of a finished prompt
-
-When a prompt has finished and made at least one call, a summary ends its rows (not while it runs, when it is folded, or for a prompt read back from history):
-
-- **Calls**: the tool calls, how many failed, how long the prompt took, and how much of that some call was running (overlaps count once).
-- **By tool**: one line per tool, the most called first, with its calls, average time, total time and tokens, and its failures.
-- **Average**, **slowest** and **heaviest** call (the one that moved the most text, in plus out).
-- **Tokens**: in, out and total, as the API reported them for the prompt and its subagents; the **cache** line says how much input came from the cache, and **call text** the estimate of what the tools were given and returned. With no reported usage the tokens line is the estimate (the prompt and every call's input, the answer and every call's output).
-- **Models**: the models the prompt and its subagents ran on.
-- **Subagents**: how many, how many failed, and the longest. They are not counted as tool calls, and their time overlaps their own calls.
-- **Approvals**, **Compacts** and **Error** lines, as in the section above.
-
-The summary collapses to its header with a click on `▾ Summary` (`▸` when collapsed); the copy button stays in the header. A prompt's choice is kept.
-
-**Copy** (a button on the summary's header) puts the whole summary on the clipboard as markdown: a bullet list of the figures and a table with every tool, for a ticket, a PR or a chat. `src/pane/markdown.ts` builds it.
-
-## Layout
-
-```
-hooks/hooks.json      names the one hooks module
-hooks/register.tsx    wires the three parts below
-src/lifecycle.tsx     opening the pane, /call-stack, the button that reopens it
-src/recording.ts      turns, subagents and tool calls into rows
-src/pane/             drawing the rows: index (reads state, picks the view),
-                      toolbar, section, row, bar, details, block, widget, theme,
-                      cells (the right-hand columns), report (the summary),
-                      resource (a call's resource rows and their details), sequence (a shell call's commands), tags (what a row says beside its name)
-src/stats.ts          the summary's numbers, from a prompt's rows, and modelOf
-src/touch.ts          what a call touched, read from its arguments
-src/names.ts          a call's name on its row (the program a shell call runs)
-src/resources.ts      what a call involved: its files, addresses, command, search
-src/state.ts          every atom, and every read and write of the state
-src/history.ts        reads the chat's earlier messages into rows
-src/nodes.ts          row bookkeeping: upsert, patch, keep (cut text to a file), guard
-src/format.ts         text helpers: clip, describe, durations, token estimates
-src/config.ts         limits and names
-types/index.d.ts      the row type and the state the mod declares
-```
-
-The engine reads a hooks module by scanning its source, which sets two rules for splitting it:
-
-- `$` may be passed to another file only into a `function` declaration, never an arrow function in a `const`, and never stored in an object. So helpers that take `$` are declared with `function`, and the pane parts take `$` as their first argument next to the context they draw from.
-- The state scan wants each atom beside the `update` that writes it, so `src/state.ts` holds all the atoms and the rest of the mod calls its functions (`setMode($, ...)`, `toggleFolded($, id)`) instead of `read` and `update`.
-
-`claude plugin validate .` reports a break of either rule, naming the file and line.
+All the details (reading the tree, tokens, models, errors, the summary, the code layout) are in the [Reference](https://github.com/Rickedb/agent-call-stack#reference).
 
 ## Develop
-
-Validate and type-check:
 
 ```bash
 claude plugin validate .   # checks the manifest and reads the hooks module as the engine will
@@ -138,4 +63,3 @@ claude plugin test .       # runs agent-call-stack.test.tsx
 ```
 
 Run these from this folder (`claude/`). Load it in a session with `claude --plugin-dir <this folder>`.
-

@@ -4,6 +4,9 @@ import { PANE } from './config'
 import { backfill } from './history'
 import { readClosed, readNodes, setClosed } from './state'
 
+// What every open asks for: transparent, so the terminal's own background shows through the pane.
+const OPEN = { id: PANE, title: 'Agent Call Stack', backgroundColor: 'transparent' } as const
+
 // Opening the pane at session start, the `/call-stack` command that opens it
 // again, and the button above the prompt that does the same once it is closed.
 export const lifecycle = (on: On) => {
@@ -13,7 +16,7 @@ export const lifecycle = (on: On) => {
       description: 'Show the call stack of this session in a pane',
     })
     await setClosed($, false)
-    void $.ui.open({ id: PANE, title: 'Agent Call Stack' })
+    void $.ui.open(OPEN)
 
     // Running bars grow with the clock: redraw once a second while any runs.
     $.clock.every(1000, async () => {
@@ -28,7 +31,7 @@ export const lifecycle = (on: On) => {
 
   on('command.run', { command: 'call-stack' }, async $ => {
     await setClosed($, false)
-    await $.ui.open({ id: PANE, title: 'Agent Call Stack' })
+    await $.ui.open(OPEN)
     return { text: 'Agent Call Stack pane opened.' }
   })
 
@@ -49,7 +52,7 @@ export const lifecycle = (on: On) => {
           key="open-call-stack"
           onPress={async () => {
             await setClosed($, false)
-            await $.ui.open({ id: PANE, title: 'Agent Call Stack' })
+            await $.ui.open(OPEN)
           }}
         >
           Open call stack

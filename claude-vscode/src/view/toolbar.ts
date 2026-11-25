@@ -17,7 +17,7 @@ export const empty = (v: View): string => {
         <b>No calls yet</b>
         <p>Send a prompt to Claude Code and what it does shows up here, as a tree.</p>
         ${off}
-        <p class="dim">Nothing showing up? A session that was open when the hooks were added picks them up when it starts again. Check that <code>node</code> is installed (on Windows, on your PATH).</p>
+        <p class="dim">Nothing showing up? A session that was open when the hooks were added picks them up when it starts again. Check that <code>node</code> is installed.</p>
       </div>`
   }
   return `<div class="empty">
@@ -27,7 +27,7 @@ export const empty = (v: View): string => {
           ${button('installUser', 'Add to your settings', '', 'primary')}
           ${v.hasWorkspace ? button('installWorkspace', 'This workspace only (local settings)') : ''}
         </div>
-        <p class="dim">The hooks run with <code>node</code>, or with VS Code itself when there is none (not on Windows, where <code>node</code> must be on your PATH). ${setting}</p>
+        <p class="dim">The hooks run with <code>node</code>, or with VS Code itself when there is none. ${setting}</p>
       </div>`
 }
 

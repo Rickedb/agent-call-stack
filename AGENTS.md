@@ -28,7 +28,7 @@ What is recorded, folded, counted (tokens) and summed up (a finished prompt's su
 - **Exceptions are told, never silent.** If a feature cannot or should not exist on a target (the agent gives no hook for it, an API is missing), say so in "Known exceptions" with the reason, and in that target's README. Do not leave it for someone to discover.
 - **Same change, same time.** Make the change for every target in one piece of work, ideally one commit. If one target must wait, add it to "Known exceptions" as a gap to close, with what is missing.
 - **New agent, same bar.** A new target starts with the full feature set of the existing ones, and its gaps are listed here.
-- **Docs follow.** Each target's README (`claude/README.md`, `vscode/README.md`) and the root README say how to use it and what differs. Keep the feature lists in step.
+- **Docs follow.** Each target's README (`claude/README.md`, `vscode/README.md`, `claude-vscode/README.md`) is a short summary: what it shows, how to start, what to know. The details (how it works, what each row means, tokens, differences, code layout) live in the root README's *Reference*. Keep both in step.
 
 ## Checklist for a change
 

@@ -17,7 +17,7 @@ export const empty = (v: View): string => {
         <b>No calls yet</b>
         <p>Send a prompt to Copilot in agent mode and what it does shows up here, as a tree.</p>
         ${off}
-        <p class="dim">Nothing showing up? Start a new agent chat and check that <code>node</code> is installed (on Windows, on your PATH).</p>
+        <p class="dim">Nothing showing up? Start a new agent chat and check that <code>node</code> is installed.</p>
       </div>`
   }
   return `<div class="empty">
@@ -27,7 +27,7 @@ export const empty = (v: View): string => {
           ${button('installUser', 'Install for all workspaces', '', 'primary')}
           ${v.hasWorkspace ? button('installWorkspace', 'This workspace only') : ''}
         </div>
-        <p class="dim">The hooks run with <code>node</code>, or with VS Code itself when there is none (not on Windows, where <code>node</code> must be on your PATH). Agent hooks are a preview feature of VS Code. ${setting}</p>
+        <p class="dim">The hooks run with <code>node</code>, or with VS Code itself when there is none. Agent hooks are a preview feature of VS Code. ${setting}</p>
       </div>`
 }
 

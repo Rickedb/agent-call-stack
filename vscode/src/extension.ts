@@ -6,7 +6,7 @@ import * as vscode from 'vscode'
 
 import { ChatModelReader } from './chatmodels'
 import { collapseOlder } from './collapse'
-import { hookFile, installHookFile, installRecorder, refreshHookFile, removeHookFile, runtime, type Runtime } from './hooks'
+import { hookFile, installHookFile, installRecorder, refreshHookFile, removeHookFile, runtime, withLauncher, type Runtime } from './hooks'
 import type { Session } from './model'
 import { foldableIds, isRunning, renderBody, renderText, summaryMarkdown } from './render'
 import { EventStore } from './store'
@@ -220,7 +220,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
   const provider = new CallStackView(ctx, store)
   const recorderSource = ctx.asAbsolutePath(path.join('out', 'record.js'))
   // What the hooks run the recorder with: node, or VS Code itself as node when the setting is on.
-  const node = (): Runtime => runtime(vscode.workspace.getConfiguration('agentCallStack').get<boolean>('useElectronAsNode') === true)
+  const node = (recorder: string): Runtime => withLauncher(runtime(vscode.workspace.getConfiguration('agentCallStack').get<boolean>('useElectronAsNode') === true), recorder, dataDir())
 
   // The recorder the hooks run is a copy; keep it as new as the extension.
   if (hooksInstalled()) {
@@ -228,7 +228,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
       const recorder = installRecorder(recorderSource, dataDir())
       // ...and the hook files list every event it records.
       for (const f of [hookFile('user'), ...workspaceFolders().map(w => hookFile('workspace', w))]) {
-        if (f) refreshHookFile(f, recorder, node())
+        if (f) refreshHookFile(f, recorder, node(recorder))
       }
     } catch {
       // The copy there keeps working.
@@ -270,7 +270,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
     if (!file) return
     try {
       const recorder = installRecorder(recorderSource, dataDir())
-      installHookFile(file, recorder, node())
+      installHookFile(file, recorder, node(recorder))
     } catch (err) {
       void vscode.window.showErrorMessage(`Agent Call Stack: could not install hooks: ${String(err)}`)
       return
@@ -286,7 +286,7 @@ export function activate(ctx: vscode.ExtensionContext): void {
       if (answer === 'Remove it') removeHookFile(other)
     }
     void vscode.window.showInformationMessage(
-      `Agent Call Stack hooks installed in ${file}. Start a new Copilot agent chat. If nothing shows up, check that agent hooks are enabled in VS Code (setting chat.useHooks) and that node is installed (on Windows, on your PATH).`,
+      `Agent Call Stack hooks installed in ${file}. Start a new Copilot agent chat. If nothing shows up, check that agent hooks are enabled in VS Code (setting chat.useHooks) and that node is installed.`,
     )
     provider.render()
   }
