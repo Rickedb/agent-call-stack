@@ -8,7 +8,7 @@ import { historyNodes, readHistory, userText } from '../history'
 import { Session } from '../model'
 import { renderBody, type View } from '../render'
 import { reportOf } from '../stats'
-import { TranscriptReader } from '../transcript'
+import { Parsed, TranscriptReader } from '../transcript'
 import type { Ev, Node } from '../types'
 
 const at = (s: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, s)).toISOString()
@@ -166,4 +166,52 @@ test('the reader reads history once the transcript is there, and a history promp
   const html = renderBody(s, view({ selected: (s.nodes.find(n => n.name === 'Edit') as Node).id }))
   assert.match(html, /read back from the transcript, from before the hooks/)
   fs.rmSync(dir, { recursive: true })
+})
+
+const cancelMark = (s: number, over: object = {}, text = '[Request interrupted by user]') => user(s, [{ type: 'text', text }], over)
+
+test('a cancel is a user message that starts with the marker, and nothing that only holds those words', () => {
+  const p = new Parsed()
+  p.feed(
+    [
+      cancelMark(4),
+      cancelMark(8, {}, '[Request interrupted by user for tool use]'),
+      // A tool result that holds the words (a file being read), a prompt that quotes them, a subagent's own.
+      result(9, 'r1', 'the marker is "[Request interrupted by user]" in the transcript'),
+      user(10, 'why does it say [Request interrupted by user] in the log?'),
+      cancelMark(11, { isSidechain: true }),
+    ].join('\n') + '\n',
+  )
+  assert.deepEqual(p.interrupts, [ms(4), ms(8)])
+})
+
+test('a prompt the hooks left open is ended as interrupted at the cancel the transcript tells of', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'call-stack-'))
+  const file = path.join(dir, 't.jsonl')
+  fs.writeFileSync(file, [user(0, 'long job'), reply(1, [use('b1', 'Bash', { command: 'sleep 60' })]), cancelMark(6)].join('\n') + '\n')
+  const s = new Session('s')
+  s.apply({ v: 1, t: ms(0), sid: 's', kind: 'prompt', arg: 'long job', transcript: file })
+  s.apply({ v: 1, t: ms(2), sid: 's', kind: 'tool_pre', tool: 'Bash', toolUseId: 'b1', arg: 'sleep 60' })
+  // The next prompt began later, and closed the first as done; the session end closed nothing more.
+  s.apply({ v: 1, t: ms(120), sid: 's', kind: 'prompt', arg: 'next', transcript: file })
+  const first = s.nodes.find(n => n.kind === 'prompt') as Node
+  assert.equal(first.status, 'ok')
+  new TranscriptReader().apply(s)
+  assert.deepEqual([first.status, first.why, first.end], ['err', 'interrupted', ms(6)])
+  const call = s.nodes.find(n => n.kind === 'tool') as Node
+  assert.deepEqual([call.status, call.end], ['err', ms(6)])
+  const second = s.nodes.filter(n => n.kind === 'prompt')[1] as Node
+  assert.deepEqual([second.status, second.why], ['run', undefined])
+})
+
+test('a prompt that got its Stop is not marked, even if a cancel falls in its time', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'call-stack-'))
+  const file = path.join(dir, 't.jsonl')
+  fs.writeFileSync(file, [user(0, 'quick'), cancelMark(3)].join('\n') + '\n')
+  const s = new Session('s')
+  s.apply({ v: 1, t: ms(0), sid: 's', kind: 'prompt', arg: 'quick', transcript: file })
+  s.apply({ v: 1, t: ms(2), sid: 's', kind: 'stop', transcript: file })
+  new TranscriptReader().apply(s)
+  const p = s.nodes.find(n => n.kind === 'prompt') as Node
+  assert.deepEqual([p.status, p.why], ['ok', undefined])
 })

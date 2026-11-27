@@ -139,3 +139,48 @@ test('sessions are told apart and filtered by folder', () => {
   assert.deepEqual(m.list(['/w/one']).map(s => s.id), ['a'])
   assert.deepEqual(m.list(['/w']).map(s => s.id), ['b', 'a'])
 })
+
+test('a cancel ends the running prompt and what runs under it, as interrupted, at the moment of the cancel', () => {
+  const s = run(
+    ev({ kind: 'prompt', arg: 'long job' }),
+    ev({ kind: 'tool_pre', tool: 'Bash', arg: 'sleep', toolUseId: 'u1' }),
+  )
+  const prompt = s.nodes[0] as NonNullable<(typeof s.nodes)[0]>
+  s.interrupt(prompt.start + 500)
+  assert.deepEqual([prompt.status, prompt.why, prompt.end], ['err', 'interrupted', prompt.start + 500])
+  const call = byName(s, 'Bash')
+  assert.deepEqual([call?.status, call?.end, call?.output], ['err', prompt.start + 500, '(no result recorded)'])
+})
+
+test('a cancel that is read after the next prompt began still ends the prompt at the cancel, not at the next prompt', () => {
+  const s = run(
+    ev({ kind: 'prompt', arg: 'first' }),
+    ev({ kind: 'tool_pre', tool: 'Bash', arg: 'sleep', toolUseId: 'u1' }),
+    ev({ kind: 'prompt', arg: 'second' }),
+  )
+  const [first, , second] = s.nodes as [NonNullable<(typeof s.nodes)[0]>, NonNullable<(typeof s.nodes)[0]>, NonNullable<(typeof s.nodes)[0]>]
+  // The next prompt closed the first as done, at its own start.
+  assert.equal(first.status, 'ok')
+  const cancelAt = first.start + 15
+  s.interrupt(cancelAt)
+  assert.deepEqual([first.status, first.why, first.end], ['err', 'interrupted', cancelAt])
+  assert.deepEqual([byName(s, 'Bash')?.status, byName(s, 'Bash')?.end], ['err', cancelAt])
+  // The prompt that followed is not touched.
+  assert.deepEqual([second.status, second.why], ['run', undefined])
+})
+
+test('a prompt that was stopped normally is not marked by a cancel in the log, and a cancel is told once', () => {
+  const s = run(ev({ kind: 'prompt', arg: 'done' }), ev({ kind: 'stop', output: 'ok' }))
+  const prompt = s.nodes[0] as NonNullable<(typeof s.nodes)[0]>
+  s.interrupt(prompt.start + 1)
+  assert.deepEqual([prompt.status, prompt.why], ['ok', undefined])
+
+  const c = run(ev({ kind: 'prompt', arg: 'cancelled' }))
+  const p = c.nodes[0] as NonNullable<(typeof c.nodes)[0]>
+  c.interrupt(p.start + 3)
+  c.interrupt(p.start + 3)
+  c.interrupt(p.start + 9)
+  assert.deepEqual([p.status, p.why, p.end], ['err', 'interrupted', p.start + 3])
+  // Nothing began before it: nothing to mark.
+  run(ev({ kind: 'prompt', arg: 'late' })).interrupt(1)
+})

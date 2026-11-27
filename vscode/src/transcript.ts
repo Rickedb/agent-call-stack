@@ -1,5 +1,7 @@
 import * as fs from 'node:fs'
+import * as path from 'node:path'
 
+import { copilotHome } from './hooks'
 import type { Session } from './model'
 import type { Node } from './types'
 import { clip } from './view/format'
@@ -25,6 +27,8 @@ type Note = {
 /** Incrementally reads the Copilot transcript records that contain model thinking and reply text. */
 export class ParsedTranscript {
   notes: Note[] = []
+  /** When the person cancelled a prompt (`abort`, `user_initiated`), as epoch milliseconds. */
+  aborts: number[] = []
   offset = 0
   private rest = ''
   private last = 0
@@ -60,6 +64,8 @@ export class ParsedTranscript {
       this.add(id, 'Thinking', data.reasoningText, start, t)
       this.add(id, 'Reply', data.content, start, t)
     }
+    // A cancel (Esc, the stop button): the hooks say nothing of it, the agent's log does.
+    if (value.type === 'abort' && isRec(value.data) && value.data.reason === 'user_initiated') this.aborts.push(t)
     this.last = t
   }
 
@@ -84,6 +90,12 @@ const noteRow = (n: Note, parent: string): Node => ({
   output: n.text,
   outputLen: n.len,
 })
+
+/** Where VS Code's agent host keeps a session's log, when it is there. */
+const sessionLog = (id: string): string | undefined => {
+  const file = path.join(copilotHome(), 'session-state', id, 'events.jsonl')
+  return fs.existsSync(file) ? file : undefined
+}
 
 /** Reads notes for the prompt and any subagent with its own transcript path. */
 export class TranscriptReader {
@@ -116,9 +128,12 @@ export class TranscriptReader {
     if (!s) return
     const prompts = s.nodes.filter(n => n.kind === 'prompt')
     const notes: Node[] = []
-    const mainPath = [...prompts].reverse().find(p => p.transcript)?.transcript
+    // The log a hook named, or, when none has yet (a prompt cancelled before any `Stop`), the one the host keeps
+    // under the session's own id.
+    const mainPath = [...prompts].reverse().find(p => p.transcript)?.transcript ?? sessionLog(s.id)
     const main = mainPath ? this.read(mainPath) : undefined
     if (main) {
+      for (const t of main.aborts) s.interrupt(t)
       const own = main.notes
       prompts.forEach((p, i) => {
         const from = p.start - 1000

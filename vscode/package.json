@@ -2,7 +2,7 @@
   "name": "agent-call-stack-copilot",
   "displayName": "Agent Call Stack for Copilot",
   "description": "See what GitHub Copilot's agent is doing as a live call stack: prompts, the model's thinking and replies, subagents and tool calls, as a tree or a waterfall with status, duration and token sizes.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "rickedb",
   "icon": "media/icon.png",
   "license": "MIT",

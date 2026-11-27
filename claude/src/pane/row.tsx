@@ -12,6 +12,10 @@ import { tagOf } from './tags'
 import { toolArg, toolName } from '../names'
 import { glyph, mark, tint } from './theme'
 
+// The room the words of a row keep, at most, before its tag is cut short; the least a tag is shown in.
+const MIN_ARG = 10
+const MIN_TAG = 4
+
 // One row: the tree guides and fold arrow, a status glyph, name and argument,
 // then (to the right, in columns) its output's size and its time; the bar under it in the waterfall; its details when picked.
 export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
@@ -44,8 +48,16 @@ export function row($: EngineInterface, c: Pane, s: Section, place: Place) {
   const room =
     c.cols - lead - markW - (isSlowest ? 8 : 0) - tokCol - timeCol - barCol - 1
   const model = node.model ? modelName(node.model) : ''
-  const tag = tagOf(node)
-  const arg = clip(toolArg(node), room - name.length - (model ? model.length + 1 : 0) - (tag ? tag.text.length + 1 : 0) - 1)
+  // What follows the name: the model, a tag (`interrupted`, `asked, waited 2s`) and the words of the call or the
+  // prompt. The words get the room they need (all of them, up to MIN_ARG cells), so that a row can still be told
+  // apart; the tag is cut short to what is left, or left off under MIN_TAG cells. The mark still says it failed,
+  // and the details and the summary give the whole of the tag.
+  const words = toolArg(node)
+  const left = room - name.length - (model ? model.length + 1 : 0) - 1
+  const found = tagOf(node)
+  const tagRoom = left - Math.min(words.length, MIN_ARG) - 1
+  const tag = found && tagRoom >= MIN_TAG ? { ...found, text: clip(found.text, tagRoom) } : undefined
+  const arg = clip(words, left - (tag ? tag.text.length + 1 : 0))
 
   return (
     <Box flexDirection="column">

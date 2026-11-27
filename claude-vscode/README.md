@@ -71,6 +71,7 @@ It follows your VS Code theme (the colors are the theme's own). Before the hooks
 - Models, tokens, and Thinking and Reply rows are read from Claude Code's transcript, so they show a moment after a turn ends.
 - What the chat held before the hooks were added is read back from the transcript, without approvals or exact times.
 - Hooks only tell of a call when you are asked or a classifier refuses it, so the other calls carry no approval information.
+- A prompt you cancel (Esc or the stop button) shows as `interrupted` a moment after, read from the transcript; Claude Code doesn't run `Stop` for a cancel.
 
 All the details, and how it differs from the other targets, are in the [Reference](https://github.com/Rickedb/agent-call-stack#reference).
 

@@ -48,6 +48,8 @@ export class Parsed {
   replies: Reply[] = []
   boundaries: Boundary[] = []
   notes: Note[] = []
+  /** When the person cancelled a prompt (Esc, the stop button): Claude Code writes it as a user message, `[Request interrupted by user]`. */
+  interrupts: number[] = []
   offset = 0
   private rest = ''
   private byId = new Map<string, Reply>()
@@ -74,6 +76,7 @@ export class Parsed {
     if (!isReply && line.includes('"type":"user"')) {
       const at = Date.parse(STAMP.exec(line)?.[1] ?? '')
       if (Number.isFinite(at)) this.last[line.includes('"isSidechain":true') ? 'side' : 'main'] = at
+      if (Number.isFinite(at) && line.includes('Request interrupted by user')) this.interrupt(line, at)
       return
     }
     if (!isReply && !line.includes('compact_boundary')) return
@@ -134,6 +137,23 @@ export class Parsed {
     }
     if (id) this.byId.set(id, reply)
     this.replies.push(reply)
+  }
+
+  // The marker of a cancel is a text block of a user message that starts with those words; a tool result or a
+  // prompt that only holds them (a file read, a pasted line) is not one.
+  private interrupt(line: string, at: number): void {
+    if (line.includes('"isSidechain":true')) return
+    let o: unknown
+    try {
+      o = JSON.parse(line)
+    } catch {
+      return
+    }
+    if (!isRec(o) || o.type !== 'user' || !isRec(o.message) || !Array.isArray(o.message.content)) return
+    const marker = o.message.content.some(
+      b => isRec(b) && b.type === 'text' && typeof b.text === 'string' && b.text.startsWith('[Request interrupted by user'),
+    )
+    if (marker) this.interrupts.push(at)
   }
 
   // The thinking and the text of one line of a response: each block is a line of its own.
@@ -315,5 +335,6 @@ export class TranscriptReader {
       if (t) agents.set(a.transcript, t)
     }
     assign(s, main, agents)
+    for (const t of main?.interrupts ?? []) s.interrupt(t)
   }
 }

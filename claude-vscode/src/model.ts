@@ -74,6 +74,8 @@ export class Session {
   private pending: string[] = []
   /** Spawn calls seen, waiting for their subagent's start. */
   private spawns: Spawn[] = []
+  /** The prompts that got their `Stop` (or a `StopFailure`): they ended on their own, so a cancel in the transcript is not theirs. */
+  private stopped = new Set<string>()
 
   constructor(readonly id: string) {}
 
@@ -217,7 +219,36 @@ export class Session {
     }).id
   }
 
+  /**
+   * Marks the prompt the person cancelled at `t` (Esc, the stop button): it failed, "interrupted", and ended
+   * then, with whatever was still running under it. Claude Code does not run `Stop` for a cancel, so the hooks
+   * do not tell of it; the transcript does, once read: the prompt is the last one that began by `t` and was not
+   * stopped normally. Calling it again for the same cancel changes nothing.
+   */
+  interrupt(t: number): void {
+    let p: Node | undefined
+    for (const n of this.nodes) if (n.kind === 'prompt' && n.start <= t && (!p || n.start >= p.start)) p = n
+    if (!p || this.stopped.has(p.id) || p.why === 'interrupted') return
+    if (p.id === this.root && p.status === 'run') this.finishRoot(t, 'err', {}, 'interrupted')
+    const below = new Set([p.id])
+    for (const n of this.nodes) if (n.parent && below.has(n.parent)) below.add(n.id)
+    for (const n of this.nodes) {
+      if (!below.has(n.id) || n.id === p.id) continue
+      if (n.kind !== 'tool' && n.kind !== 'agent') continue
+      // What ran when the cancel came, or was closed later by the next prompt: it ended at the cancel.
+      if (n.status !== 'run' && (n.end ?? 0) <= t) continue
+      n.end = Math.max(n.start, t)
+      n.status = 'err'
+      if (n.kind === 'tool' && !n.output) n.output = '(no result recorded)'
+      if (n.kind === 'tool' && n.perm?.decision === 'ask' && n.perm.ran === undefined) n.perm = { ...n.perm, refused: true }
+    }
+    p.status = 'err'
+    p.end = Math.max(p.start, t)
+    p.why = 'interrupted'
+  }
+
   private stop(ev: Ev): void {
+    if (this.root) this.stopped.add(this.root)
     this.finishRoot(ev.t, 'ok', texts(ev, 'output'))
     const top = this.byId.get(this.root)
     if (top && ev.transcript) top.transcript = ev.transcript
@@ -252,6 +283,7 @@ export class Session {
   // The turn ended on an API error instead of an answer: the prompt failed, with the reason.
   private stopFail(ev: Ev): void {
     this.ensureRoot(ev.t)
+    if (this.root) this.stopped.add(this.root)
     this.finishRoot(ev.t, 'err', texts(ev, 'output'), ev.arg || 'API error')
   }
 

@@ -2,7 +2,7 @@
   "name": "agent-call-stack-claude",
   "displayName": "Agent Call Stack for Claude",
   "description": "See what Claude Code is doing as a live call stack: prompts, the model's thinking and replies, subagents and tool calls, as a tree or a waterfall with status, duration, models, tokens, approvals, errors and compactions.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "rickedb",
   "icon": "media/icon.png",
   "license": "MIT",

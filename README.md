@@ -110,9 +110,13 @@ Neither counts as a call in the totals. After an update the extension rewrites t
 
 #### Transcript
 
-Copilot's hooks name the file the chat's transcript is kept in, on a turn's end (`Stop`), a subagent's start and stop, and a compaction. The row's details show that path, with a button that copies it. A running prompt has none yet, and not every host sends it.
+Copilot's hooks name the file the chat's transcript is kept in, on a turn's end (`Stop`), a subagent's start and stop, and a compaction. The row's details show that path, with a button that copies it. A running prompt has none yet, and not every host sends it. Until a hook names it, the extension looks for the log where VS Code's agent host keeps it, under the session's own id (`~/.copilot/session-state/<session id>/events.jsonl`).
 
 When the transcript is available, the tree also shows a `Thinking` row for the model's reasoning text and a `Reply` row for each nonempty assistant message, under the prompt (or a subagent with its own transcript). They are read from the transcript's `assistant.message` entries, not the hooks; their displayed time runs from the preceding transcript entry to the message. The transcript can be written asynchronously, so these rows may appear shortly after the turn ends. The file format is VS Code's own and undocumented; if it changes, these rows may be unavailable.
+
+#### Cancelled prompts
+
+Pressing Esc (or the stop button) on a running prompt shows as `✗ Prompt N interrupted`, with whatever was still running under it failed, ending at the moment of the cancel. Copilot's hooks say nothing of a cancel (no `Stop` comes), so it is read from the agent log, which writes an `abort` entry with `reason: user_initiated`: the prompt it ends is the last one that began by then and was not stopped normally. It shows a moment after the cancel, once the log is read, and depends on that undocumented format. Before this, a cancelled prompt stayed "running" until the next one began, and was then drawn as done.
 
 #### Summary of a finished prompt
 
@@ -227,6 +231,10 @@ The resource rows under a tool call (see *Reading the tree*) are read from what 
 
 When the view first draws a session, what the chat held before the hooks were added (or before a resumed session started) is read back from Claude Code's transcript, like the mod reads the chat when it loads: the prompts, each call with what came back, subagent calls, and the compactions, newest 30 prompts at most and the end of a transcript over 64 MB. They go before the recorded ones, folded as older prompts are, marked in their details as read back. A prompt the hooks began in the middle of takes its words and earlier calls from the transcript and keeps what the hooks saw. Rows read back have the times the lines were written (a wait for you is in them), no verdicts, and no inside of a subagent. A session that never fired a hook is not known to the view, so it has no history either.
 
+#### Cancelled prompts
+
+Pressing Esc (or the stop button) on a running prompt shows as `✗ Prompt N interrupted`, with whatever was still running under it failed, ending at the moment of the cancel. Claude Code does not run the `Stop` hook for a cancel, so the hooks say nothing of it; the transcript does, as a user message `[Request interrupted by user]` (or `… for tool use`). The prompt it ends is the last one that began by then and did not get its `Stop`. It shows once the transcript is read, a moment after the cancel. Before this, a cancelled prompt stayed open until the next one began (drawn as done) or the session ended (drawn as "session ended", with an hour-long bar if you left it open).
+
 #### Summary of a finished prompt
 
 When a prompt has finished and made at least one call, a summary ends its rows: the calls, how many failed and how long they ran of the prompt's time; one line per tool (calls, average, total, tokens); the average, slowest and heaviest call; the models; the tokens (reported, with the cache and the call text estimate) ; approvals, compactions, subagents and errors. It collapses to its header with `▾ Summary`, and **Copy** puts it on the clipboard as markdown.
@@ -306,6 +314,10 @@ Compaction and error rows count as neither calls nor failed calls in the pane's 
 #### Transcript
 
 A prompt's details give the path of the conversation's transcript file (from the `Stop` hook, so once the turn ends), and a subagent's its own (from `SubagentStop`), with a button that copies it. A running row has none yet. The VS Code port does the same with what Copilot's hooks give.
+
+#### Cancelled prompts
+
+Pressing Esc on a running prompt ends it as `✗ Prompt N … interrupted`, and the call that was running fails, "no result recorded". The engine tells the mod (`turn.complete` with `aborted`), so it shows at once. In a narrow pane the `interrupted` tag is cut short or left off so the prompt's own words keep their room; the details give the whole of it.
 
 #### Summary of a finished prompt
 

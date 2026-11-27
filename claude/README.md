@@ -60,6 +60,7 @@ The mod watches what Claude does and draws it; it never changes what Claude does
 - Details open inline, under the row (the engine has no modal API; the VS Code extensions use a modal).
 - The chat's earlier messages are read in when the mod loads, as prompts and calls, without Thinking and Reply rows or exact times.
 - The same view exists for [Claude Code in VS Code](https://github.com/Rickedb/agent-call-stack/tree/master/claude-vscode#readme) and [GitHub Copilot](https://github.com/Rickedb/agent-call-stack/tree/master/vscode#readme).
+- A prompt you cancel with Esc shows as `interrupted` at once. In a narrow pane its tag may be cut short so the prompt's words keep their room.
 
 All the details (reading the tree, tokens, models, errors, the summary, the code layout) are in the [Reference](https://github.com/Rickedb/agent-call-stack#reference).
 

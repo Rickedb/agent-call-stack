@@ -122,3 +122,44 @@ const view = (over: Partial<View> = {}): View => ({
   picked: '',
   ...over,
 })
+
+test('only a cancel the person made is an abort: other reasons and other entries are not', () => {
+  const parsed = new ParsedTranscript()
+  parsed.feed(
+    lines(
+      entry('user.message', '00.000', { content: 'go' }),
+      entry('abort', '02.500', { reason: 'user_initiated' }, 'a1'),
+      entry('abort', '03.000', { reason: 'something_else' }, 'a2'),
+      entry('abort', '04.000', {}, 'a3'),
+    ),
+  )
+  assert.deepEqual(parsed.aborts, [T('02.500')])
+})
+
+test('a prompt cancelled before any Stop names no log, so the reader finds the session\'s own and marks the prompt', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'call-stack-'))
+  const before = process.env.COPILOT_HOME
+  process.env.COPILOT_HOME = home
+  try {
+    const dir = path.join(home, 'session-state', 'sess')
+    fs.mkdirSync(dir, { recursive: true })
+    fs.writeFileSync(
+      path.join(dir, 'events.jsonl'),
+      lines(entry('user.message', '00.000', { content: 'go' }), entry('abort', '07.000', { reason: 'user_initiated' })),
+    )
+    const s = new Session('sess')
+    const start = T('00.500')
+    s.apply({ v: 1, t: start, sid: 'sess', kind: 'prompt', arg: 'go' })
+    s.apply({ v: 1, t: start + 1000, sid: 'sess', kind: 'tool_pre', tool: 'Bash', toolUseId: 'u', arg: 'sleep 60' })
+    new TranscriptReader().apply(s)
+    const prompt = s.nodes.find(n => n.kind === 'prompt') as Node
+    assert.deepEqual([prompt.status, prompt.why, prompt.end], ['err', 'interrupted', T('07.000')])
+    assert.equal(s.nodes.find(n => n.kind === 'tool')?.status, 'err')
+    // The next draw reads nothing new and changes nothing.
+    new TranscriptReader().apply(s)
+    assert.equal(prompt.end, T('07.000'))
+  } finally {
+    if (before === undefined) delete process.env.COPILOT_HOME
+    else process.env.COPILOT_HOME = before
+  }
+})

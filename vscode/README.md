@@ -70,6 +70,7 @@ It follows your VS Code theme (the colors are the theme's own). Before the hooks
 - Only what happens after the hooks are installed is recorded; earlier chat is not read back.
 - Token figures are estimates, and the model is read from VS Code's own chat log, so it can be missing: Copilot's hooks give neither.
 - There is no approval information, and Thinking and Reply rows show after a prompt ends.
+- A prompt you cancel (Esc or the stop button) shows as `interrupted` a moment after, read from the agent's log; Copilot's hooks don't tell of it.
 
 All the details, and how it differs from the Claude Code targets, are in the [Reference](https://github.com/Rickedb/agent-call-stack#reference).
 

@@ -569,8 +569,9 @@ test('a prompt that did not end in an answer says why, and the summary lists eve
   await $.turn.complete({ turnId: 'er', reason: 'error', answer: '' } as never)
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-  // The prompt carries why, as a tag after its name.
-  expect(await ui.find({ type: 'Text', text: /^ rate limited: try again later$/ })).toBeDefined()
+  // The row of the prompt keeps its own words (a tag with why is cut short, or left off, to leave them room); the summary
+  // and the details below give the whole of why.
+  expect(await ui.find({ type: 'Text', text: /build it/ })).toBeDefined()
   // The cut-off reply is a row of its own, a failed one.
   expect(await ui.find({ type: 'Button', text: /Error.*the reply hit the output limit/ })).toBeDefined()
   // The summary lists each: the call with the first line of its error, and the prompt with its reason.
@@ -597,7 +598,7 @@ test('an interrupted prompt and a refused one say so', async ($, on) => {
 
   const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
   expect(await ui.find({ type: 'Text', text: /^ interrupted$/ })).toBeDefined()
-  expect(await ui.find({ type: 'Text', text: /^ refused \(cyber\): not something/ })).toBeDefined()
+  expect(await ui.find({ type: 'Text', text: /^ refused \(cyber\)/ })).toBeDefined()
   await ui.unmount()
 })
 
@@ -982,5 +983,26 @@ test('what the model writes between calls is a row each: its thinking and its re
   expect(await ui.find({ type: 'Text', text: /the model's thinking between calls/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /THINKING/ })).toBeDefined()
   expect(await ui.find({ type: 'Text', text: /Where is the config read\?/ })).toBeDefined()
+  await ui.unmount()
+})
+
+test('a cancelled prompt in a narrow pane keeps its own words: the tag gives way, the details still say why', async ($, on) => {
+  quiet(on)
+  on('tool.call', () => ({ result: {}, text: 'ok' }))
+  await $.session.start({ cwd: '/', surface: 'desktop', isInteractive: true })
+  await $.turn.start({ text: 'migrate the billing tables and then rerun the whole suite', turnId: 'nc' })
+  await $.turn.complete({ turnId: 'nc', reason: 'aborted', isAborted: true, answer: '' } as never)
+
+  for (const [columns, key] of [[52, 'view-tree'], [52, 'view-waterfall'], [100, 'view-waterfall']] as const) {
+    const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: columns }, surface: 'desktop' })
+    await ui.press({ key })
+    // The words of the prompt are on its row, as many as the width has room for (at 52 columns, its first ones).
+    expect(await ui.find({ type: 'Text', text: columns > 60 ? /migrate the billing/ : /migrate/ })).toBeDefined()
+    await ui.unmount()
+  }
+  // The details say why it failed.
+  const ui = await $.ui.mount({ ...PANE, props: { ...PANE.props, bodyColumns: 52 }, surface: 'desktop' })
+  await ui.press({ key: 'open:nc' })
+  expect(await ui.find({ type: 'Text', text: /interrupted/ })).toBeDefined()
   await ui.unmount()
 })
